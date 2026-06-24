@@ -614,6 +614,12 @@ function buildFormHTML(node,pfx){
       <span class="prov-chip-lbl">${p}</span>
     </label>`).join('');
   const extraOpts=teams.filter(t=>t!==node.teamName).map(t=>`<option value="${t}"${nodeExtra.includes(t)?' selected':''}>${t}</option>`).join('');
+  // Pre-filled contact links for NIP alert
+  const nipName=(node.firstName+' '+node.lastName).trim()||node.email||'[Name not set]';
+  const nipSubject=encodeURIComponent(`Perigee User Activation Request – ${nipName}`);
+  const nipEmailBody=encodeURIComponent(`Hi Laurette,\n\nPlease add the following person to the Perigee system so they can be included in the IRAM call cycle upload.\n\nName: ${nipName}\nEmail: ${node.email||'—'}\nJob Title: ${node.jobTitle||'—'}\nTeam: ${node.teamName||'—'}\nRole: ${getRoleInfo(node.roleType).label}\nProvince(s): ${node.assignedProvinces||'—'}\n\nKindly confirm once the account has been activated.\n\nRegards,\niRam`);
+  const nipEmailHref=`mailto:${NIP_EMAIL}?cc=HR@iram.co.za&subject=${nipSubject}&body=${nipEmailBody}`;
+  const nipWaHref=`https://wa.me/${NIP_WA}?text=${encodeURIComponent(`Hi Laurette 👋\n\nPlease add the following person to Perigee:\n\n👤 *${nipName}*\n📧 ${node.email||'—'}\n💼 ${node.jobTitle||'—'}\n🏷 Team: ${node.teamName||'—'}\n📍 ${node.assignedProvinces||'—'}\n\nThank you!`)}`;
   return`
     <div class="section-div">Identity</div>
     <div class="fg ac-wrap">
@@ -625,15 +631,15 @@ function buildFormHTML(node,pfx){
     <div id="${pfx}nipAlert" class="nip-alert" style="display:${nipShow?'block':'none'}">
       <div class="nip-title">⚠️ Not in Perigee system</div>
       <div style="margin-bottom:8px;font-size:10px;line-height:1.4">This person needs to be added by Outer Join before they can be included in a call cycle upload.</div>
-      <div class="nip-row"><span class="nip-label">📧</span><span class="nip-val">${NIP_EMAIL}</span></div>
+      <div class="nip-row"><span class="nip-label">📧</span><span class="nip-val">${NIP_EMAIL} <span style="opacity:.6;font-size:9px">· cc: HR@iram.co.za</span></span></div>
       <div class="nip-actions">
         <button class="btn-copy" onclick="copyText('${NIP_EMAIL}')">Copy Email</button>
-        <a href="mailto:${NIP_EMAIL}" class="btn-wa" style="background:#2563eb">Open Email</a>
+        <a href="${nipEmailHref}" class="btn-wa" style="background:#2563eb">Open Email ↗</a>
       </div>
       <div class="nip-row" style="margin-top:6px"><span class="nip-label">💬</span><span class="nip-val">${NIP_WA_DISPLAY}</span></div>
       <div class="nip-actions">
         <button class="btn-copy" onclick="copyText('${NIP_WA_DISPLAY}')">Copy Number</button>
-        <a href="https://wa.me/${NIP_WA}" target="_blank" class="btn-wa">Open WhatsApp</a>
+        <a href="${nipWaHref}" target="_blank" class="btn-wa">WhatsApp ↗</a>
       </div>
     </div>
     <div class="fg"><label class="fl">Perigee Status</label>
