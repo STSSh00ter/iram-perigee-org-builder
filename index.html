@@ -37,7 +37,8 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#eef2f7;color:#1e293b;he
 .filter-count{font-size:11px;color:#94a3b8;margin-left:auto}
 .filter-count b{color:#2563eb}
 .main{display:flex;flex:1;overflow:hidden}
-.tree-panel{flex:1;overflow:auto;padding:28px 32px;position:relative}
+.tree-panel{flex:1;overflow:auto;padding:28px 32px;position:relative;cursor:grab}
+.tree-panel.panning{cursor:grabbing;user-select:none}
 .tree-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:14px;color:#94a3b8}
 .tree-empty-icon{font-size:56px;opacity:.4}
 .tree-empty h2{font-size:16px;font-weight:700;color:#64748b}
@@ -747,6 +748,47 @@ function copyText(txt){
 }
 window.addEventListener('scroll',()=>document.querySelectorAll('.ac-list.open').forEach(el=>el.classList.remove('open')),true);
 window.addEventListener('resize',()=>document.querySelectorAll('.ac-list.open').forEach(el=>el.classList.remove('open')));
+
+// ─── PAN TO NAVIGATE ────────────────────────────────────────────────────────
+(()=>{
+  const panel=document.getElementById('treePanel');
+  let panning=false,startX=0,startY=0,scrollX=0,scrollY=0,moved=false;
+  const IGNORE='.node-card,.node-add-btn,.node-badge,.btn,.filter-bar,.warn-banner,.drop-root-zone,.overlay';
+  panel.addEventListener('mousedown',e=>{
+    if(e.button!==0||e.target.closest(IGNORE))return;
+    panning=true;moved=false;
+    startX=e.clientX;startY=e.clientY;
+    scrollX=panel.scrollLeft;scrollY=panel.scrollTop;
+    panel.classList.add('panning');
+    e.preventDefault();
+  });
+  window.addEventListener('mousemove',e=>{
+    if(!panning)return;
+    const dx=e.clientX-startX,dy=e.clientY-startY;
+    if(Math.abs(dx)>3||Math.abs(dy)>3)moved=true;
+    panel.scrollLeft=scrollX-dx;
+    panel.scrollTop=scrollY-dy;
+  });
+  window.addEventListener('mouseup',()=>{
+    if(!panning)return;
+    panning=false;panel.classList.remove('panning');
+  });
+  // Touch support
+  panel.addEventListener('touchstart',e=>{
+    if(e.target.closest(IGNORE))return;
+    const t=e.touches[0];
+    panning=true;startX=t.clientX;startY=t.clientY;
+    scrollX=panel.scrollLeft;scrollY=panel.scrollTop;
+  },{passive:true});
+  panel.addEventListener('touchmove',e=>{
+    if(!panning)return;
+    const t=e.touches[0];
+    panel.scrollLeft=scrollX-(t.clientX-startX);
+    panel.scrollTop=scrollY-(t.clientY-startY);
+    e.preventDefault();
+  },{passive:false});
+  panel.addEventListener('touchend',()=>{panning=false;});
+})();
 
 function renderTreeNode(nodeId,visibleIds,matchIds){
   const node=getNode(nodeId);if(!node)return'';
