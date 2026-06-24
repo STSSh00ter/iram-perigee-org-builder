@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>iRam – Perigee Org Builder</title>
 <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Segoe UI',Arial,sans-serif;background:#eef2f7;color:#1e293b;height:100vh;overflow:hidden;display:flex;flex-direction:column}
@@ -190,6 +191,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#eef2f7;color:#1e293b;he
   <span>Nodes: <b id="statNodes">0</b></span>
   <span>Teams: <b id="statTeams">0</b></span>
   <span id="statNipWrap" onclick="cycleNipNodes()" style="cursor:pointer;padding:2px 8px;border-radius:12px;transition:.15s" title="Click to cycle through unregistered users">⚠ Pending Perigee: <b id="statNip" style="color:#94a3b8">0</b></span>
+  <span id="statSync" style="margin-left:auto;font-size:10px;opacity:.6" title="Cloud sync status">☁ not connected</span>
 </div>
 <div id="filterBar"></div>
 <div class="main">
@@ -256,6 +258,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#eef2f7;color:#1e293b;he
       <div class="admin-tabs">
         <button id="adminTabLog" class="admin-tab active" onclick="switchAdminTab('log')">📋 Audit Log</button>
         <button id="adminTabTrash" class="admin-tab" onclick="switchAdminTab('trash')">🗑 Deleted Items</button>
+        <button id="adminTabSync" class="admin-tab" onclick="switchAdminTab('sync')">☁ Cloud Sync</button>
       </div>
       <div class="admin-content" id="adminContent"></div>
     </div>
@@ -279,7 +282,10 @@ const KNOWN_TEAMS=['BLUE POWER','Bosch Automotive','MM Chanel Head+Ops','Team Co
 
 let perigeeUsers=[],orgNodes=[],selectedNodeId=null,pendingParentId=null,draggedNodeId=null,filterProvince='',filterTeamName='';
 
-function saveState(){try{localStorage.setItem('iram-org-v5',JSON.stringify(orgNodes));}catch(e){}}
+function saveState(){
+  try{localStorage.setItem('iram-org-v5',JSON.stringify(orgNodes));}catch(e){}
+  syncToCloud(); // fire-and-forget; no-op if not configured
+}
 function loadState(){
   try{
     const d=localStorage.getItem('iram-org-v5');if(d)orgNodes=JSON.parse(d);
@@ -1113,6 +1119,8 @@ function switchAdminTab(tab){
   adminTab=tab;
   document.getElementById('adminTabLog').className='admin-tab'+(tab==='log'?' active':'');
   document.getElementById('adminTabTrash').className='admin-tab'+(tab==='trash'?' active':'');
+  document.getElementById('adminTabSync').className='admin-tab'+(tab==='sync'?' active':'');
+  if(tab==='sync'){renderSyncTab();return;}
   const log=getAuditLog(),trash=getTrash();
   if(tab==='log'){
     const rows=log.slice().reverse().slice(0,300);
@@ -1356,10 +1364,141 @@ function getInitialOrg(){
   ];
 }
 
+// ─── SUPABASE CLOUD SYNC ─────────────────────────────────────────────────────
+let _supa=null;
+const SUPA_CFG_KEY='iram-supa-cfg';
+
+function getSupaCfg(){try{return JSON.parse(localStorage.getItem(SUPA_CFG_KEY)||'null');}catch(e){return null;}}
+function saveSupaCfg(url,key){localStorage.setItem(SUPA_CFG_KEY,JSON.stringify({url:url.trim(),anonKey:key.trim()}));}
+
+function initSupabase(){
+  const cfg=getSupaCfg();
+  if(!cfg||!cfg.url||!cfg.anonKey){setSyncStatus('☁ not connected','#94a3b8');return false;}
+  try{
+    _supa=window.supabase.createClient(cfg.url,cfg.anonKey);
+    setSyncStatus('☁ connecting…','#f59e0b');
+    return true;
+  }catch(e){setSyncStatus('☁ error','#dc2626');return false;}
+}
+
+function setSyncStatus(msg,color){
+  const el=document.getElementById('statSync');
+  if(el){el.textContent=msg;el.style.color=color;el.style.opacity='1';}
+}
+
+async function syncToCloud(){
+  if(!_supa)return;
+  try{
+    await _supa.from('iram_org_state').upsert({id:'main',nodes:orgNodes,updated_at:new Date().toISOString(),updated_by:getDeviceId()},{onConflict:'id'});
+    setSyncStatus('☁ synced '+new Date().toLocaleTimeString(),'#059669');
+  }catch(e){setSyncStatus('☁ sync failed','#dc2626');console.warn('Supabase sync error:',e);}
+}
+
+async function loadFromCloud(){
+  if(!_supa)return false;
+  try{
+    const{data,error}=await _supa.from('iram_org_state').select('*').eq('id','main').single();
+    if(error||!data||!data.nodes)return false;
+    orgNodes=data.nodes;
+    if(perigeeUsers.length)orgNodes.forEach(n=>{n.notInPerigee=!!n.email&&!findPerigeeUser(n.email);});
+    try{localStorage.setItem('iram-org-v5',JSON.stringify(orgNodes));}catch(e){}
+    setSyncStatus('☁ synced '+new Date().toLocaleTimeString(),'#059669');
+    return true;
+  }catch(e){setSyncStatus('☁ load failed','#dc2626');return false;}
+}
+
+async function manualSync(){
+  if(!_supa){toast('Cloud sync not configured — set it up in Admin → Cloud Sync','warn');return;}
+  setSyncStatus('☁ syncing…','#f59e0b');
+  const ok=await loadFromCloud();
+  if(ok){render();toast('Refreshed from cloud ✓','success');}
+  else toast('Could not reach cloud','error');
+}
+
+function renderSyncTab(){
+  const cfg=getSupaCfg()||{};
+  const connected=!!_supa;
+  document.getElementById('adminContent').innerHTML=`
+    <div style="margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+        <span style="font-size:20px">${connected?'🟢':'🔴'}</span>
+        <span style="font-weight:700;font-size:13px">${connected?'Connected to Supabase':'Not connected'}</span>
+        ${connected?`<button class="btn btn-sm" style="background:#059669;color:#fff;margin-left:auto" onclick="manualSync()">↻ Pull latest</button>`:''}
+      </div>
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px;margin-bottom:14px">
+        <div style="font-weight:700;font-size:11px;color:#374151;margin-bottom:8px">SUPABASE SETUP (one-time)</div>
+        <ol style="font-size:11px;color:#64748b;line-height:2;padding-left:16px">
+          <li>Go to <b>supabase.com</b> → New project (free)</li>
+          <li>Open <b>SQL Editor</b> and run:<br>
+            <code style="display:block;background:#1e293b;color:#7dd3fc;padding:8px;border-radius:4px;font-size:10px;margin:4px 0;white-space:pre">CREATE TABLE iram_org_state (
+  id text PRIMARY KEY,
+  nodes jsonb DEFAULT '[]',
+  updated_at timestamptz DEFAULT now(),
+  updated_by text
+);
+INSERT INTO iram_org_state VALUES ('main','[]',now(),'setup');
+ALTER TABLE iram_org_state ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "allow_all" ON iram_org_state
+  FOR ALL USING (true) WITH CHECK (true);</code>
+          </li>
+          <li>Go to <b>Settings → API</b></li>
+          <li>Copy <b>Project URL</b> and <b>anon/public key</b> below</li>
+        </ol>
+      </div>
+      <div class="fg"><label class="fl">Supabase Project URL</label>
+        <input id="supaUrl" class="fc" placeholder="https://xxxx.supabase.co" value="${cfg.url||''}">
+      </div>
+      <div class="fg"><label class="fl">Supabase Anon Key (public)</label>
+        <input id="supaKey" class="fc" placeholder="eyJhbGci…" value="${cfg.anonKey||''}">
+      </div>
+      <div style="display:flex;gap:8px;margin-top:4px">
+        <button class="btn btn-primary btn-sm" onclick="saveAndConnectSupa()">💾 Save & Connect</button>
+        ${connected?`<button class="btn btn-sm" style="background:#059669;color:#fff" onclick="pushToCloud()">☁ Push my tree to cloud</button>`:''}
+        ${cfg.url?`<button class="btn btn-sm" style="background:#f1f5f9;color:#64748b" onclick="disconnectSupa()">Disconnect</button>`:''}
+      </div>
+    </div>`;
+}
+
+async function saveAndConnectSupa(){
+  const url=(document.getElementById('supaUrl').value||'').trim();
+  const key=(document.getElementById('supaKey').value||'').trim();
+  if(!url||!key){toast('Both URL and key are required','error');return;}
+  saveSupaCfg(url,key);
+  _supa=null;
+  if(initSupabase()){
+    setSyncStatus('☁ testing…','#f59e0b');
+    const ok=await loadFromCloud();
+    if(ok){render();toast('Connected & synced from cloud ✓','success');}
+    else{
+      // Cloud empty — push our local tree up
+      await syncToCloud();
+      toast('Connected — tree pushed to cloud ✓','success');
+    }
+    renderSyncTab();
+  }else{toast('Could not connect — check URL and key','error');}
+}
+
+async function pushToCloud(){
+  if(!_supa){toast('Not connected','error');return;}
+  setSyncStatus('☁ pushing…','#f59e0b');
+  await syncToCloud();
+  toast('Tree pushed to cloud ✓','success');
+}
+
+function disconnectSupa(){
+  if(!confirm('Disconnect from Supabase? Tree will still be saved locally.'))return;
+  localStorage.removeItem(SUPA_CFG_KEY);_supa=null;
+  setSyncStatus('☁ not connected','#94a3b8');
+  renderSyncTab();toast('Disconnected','info');
+}
+
 // ─── INIT ───────────────────────────────────────────────────────────────────
 loadState();
 if(orgNodes.length===0){orgNodes=getInitialOrg();saveState();}
 render();
+if(initSupabase()){
+  loadFromCloud().then(ok=>{if(ok)render();});
+}
 </script>
 </body>
 </html>
