@@ -6,8 +6,6 @@
 <title>iRam – Perigee Org Builder</title>
 <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Segoe UI',Arial,sans-serif;background:#eef2f7;color:#1e293b;height:100vh;overflow:hidden;display:flex;flex-direction:column}
@@ -194,6 +192,15 @@ ul.grp-children::before{border-left-style:dashed!important;border-color:#94a3b8!
 .badge-active{background:#059669}.badge-inactive{background:#94a3b8}
 ::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:#f1f5f9}
 ::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:3px}::-webkit-scrollbar-thumb:hover{background:#94a3b8}
+@media print{
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .hdr,.status-bar,.filter-bar,.edit-panel,.node-add-btn,.node-shift,.drop-root-zone,.warn-banner,.toast-container,.overlay{display:none!important}
+  body,html{overflow:visible!important;height:auto!important;background:#fff!important}
+  .main{display:block!important;overflow:visible!important;height:auto!important}
+  .tree-panel{overflow:visible!important;height:auto!important;padding:20px!important;cursor:default!important}
+  .org-wrap{min-width:unset!important}
+  .node-card{box-shadow:0 1px 4px rgba(0,0,0,.12)!important;break-inside:avoid}
+}
 </style>
 </head>
 <body>
@@ -1092,22 +1099,9 @@ function cycleNipNodes(){
   toast(`⚠ ${nipCycleIdx} of ${nips.length}: ${(node.firstName+' '+node.lastName).trim()||node.email} — not in Perigee`,'warn');
 }
 
-async function exportPDF(){
-  const el=document.querySelector('.org-wrap');
-  if(!el){toast('No tree to export','error');return;}
-  const btn=document.getElementById('btnPDF');
-  btn.disabled=true;btn.textContent='⏳ Capturing…';
-  try{
-    const canvas=await html2canvas(el,{scale:2,useCORS:true,backgroundColor:'#eef2f7',logging:false});
-    const imgData=canvas.toDataURL('image/png');
-    const {jsPDF}=window.jspdf;
-    const pw=el.scrollWidth,ph=el.scrollHeight;
-    const pdf=new jsPDF({orientation:pw>ph?'landscape':'portrait',unit:'px',format:[pw,ph],hotfixes:['px_scaling']});
-    pdf.addImage(imgData,'PNG',0,0,pw,ph);
-    pdf.save('iram-org-chart.pdf');
-    toast('PDF exported ✓','success');
-  }catch(e){toast('PDF export failed: '+e.message,'error');}
-  btn.disabled=false;btn.textContent='🖨 Export PDF';
+function exportPDF(){
+  if(!orgNodes.length){toast('Tree is empty — nothing to print','error');return;}
+  window.print();
 }
 
 function exportExcel(){
