@@ -43,8 +43,11 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#eef2f7;color:#1e293b;he
 .tree-empty-icon{font-size:56px;opacity:.4}
 .tree-empty h2{font-size:16px;font-weight:700;color:#64748b}
 .tree-empty p{font-size:13px;text-align:center;max-width:320px;line-height:1.5}
-.warn-banner{background:#fffbeb;border:1px solid #fbbf24;border-radius:8px;padding:10px 14px;margin-bottom:20px;display:flex;align-items:center;gap:10px;font-size:12px;color:#78350f}
+.warn-banner{background:#fffbeb;border:1px solid #fbbf24;border-radius:8px;padding:10px 14px;margin-bottom:20px;display:flex;align-items:center;gap:10px;font-size:12px;color:#78350f;cursor:pointer;transition:.15s}
+.warn-banner:hover{background:#fef3c7;border-color:#f59e0b}
 .warn-banner strong{display:block;margin-bottom:1px}
+.warn-banner-dismiss{margin-left:auto;font-size:16px;opacity:.5;line-height:1;padding:0 4px;flex-shrink:0}
+.warn-banner-dismiss:hover{opacity:1}
 .nip-alert{background:#fff7ed;border:1px solid #fb923c;border-radius:8px;padding:10px 12px;margin-top:6px;font-size:11px;color:#7c2d12}
 .nip-alert .nip-title{font-weight:800;font-size:12px;margin-bottom:6px;color:#9a3412}
 .nip-alert .nip-row{display:flex;align-items:center;gap:6px;margin-bottom:5px}
@@ -175,7 +178,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#eef2f7;color:#1e293b;he
   <span>Perigee users: <b id="statUsers">0</b></span>
   <span>Nodes: <b id="statNodes">0</b></span>
   <span>Teams: <b id="statTeams">0</b></span>
-  <span>Pending Perigee: <b id="statNip" style="color:#94a3b8">0</b></span>
+  <span id="statNipWrap" onclick="cycleNipNodes()" style="cursor:pointer;padding:2px 8px;border-radius:12px;transition:.15s" title="Click to cycle through unregistered users">⚠ Pending Perigee: <b id="statNip" style="color:#94a3b8">0</b></span>
 </div>
 <div id="filterBar"></div>
 <div class="main">
@@ -840,9 +843,11 @@ function render(){
       .flatMap(n=>[n.id,...allDescendants(n.id).map(d=>d.id)]));
   }
   const visibleRoots=visibleIds?roots.filter(r=>visibleIds.has(r.id)):roots;
-  const warnHTML=perigeeUsers.length===0?`
-    <div class="warn-banner"><span style="font-size:18px">⚠️</span>
-      <div><strong>No Perigee users loaded</strong>Emails won't be validated. Click <em>Load Perigee Users</em> to load the 1793-perigee.xlsx file.</div>
+  const warnHTML=perigeeUsers.length===0&&!warnBannerDismissed?`
+    <div class="warn-banner" onclick="loadPerigeeFile()" title="Click to load Perigee users file">
+      <span style="font-size:18px">⚠️</span>
+      <div><strong>No Perigee users loaded</strong>Click here to load the 1793-perigee.xlsx file and validate emails.</div>
+      <span class="warn-banner-dismiss" onclick="event.stopPropagation();dismissWarnBanner()" title="Dismiss">✕</span>
     </div>`:'';
   const dropZoneHTML=`<div id="dropRootZone" class="drop-root-zone"
     ondragover="event.preventDefault();this.classList.add('over')"
@@ -855,8 +860,40 @@ function updateStatus(){
   document.getElementById('statNodes').textContent=orgNodes.length;
   const tSet=new Set(orgNodes.flatMap(n=>[n.teamName,...(n.extraTeams||[])]).filter(Boolean));
   document.getElementById('statTeams').textContent=tSet.size;
-  const nip=nipCount();const nipEl=document.getElementById('statNip');
-  nipEl.textContent=nip;nipEl.style.color=nip>0?'#fbbf24':'#94a3b8';
+  const nip=nipCount();
+  const nipEl=document.getElementById('statNip');
+  const nipWrap=document.getElementById('statNipWrap');
+  nipEl.textContent=nip;
+  if(nip>0){
+    nipEl.style.color='#fbbf24';
+    nipWrap.style.background='rgba(251,191,36,.15)';
+    nipWrap.style.color='#fbbf24';
+  } else {
+    nipEl.style.color='#94a3b8';
+    nipWrap.style.background='';
+    nipWrap.style.color='#64748b';
+  }
+}
+
+let warnBannerDismissed=false;
+function dismissWarnBanner(){warnBannerDismissed=true;render();}
+
+let nipCycleIdx=0;
+function cycleNipNodes(){
+  const nips=orgNodes.filter(n=>n.notInPerigee);
+  if(!nips.length){
+    if(!perigeeUsers.length){loadPerigeeFile();return;}
+    toast('No pending Perigee nodes','info');return;
+  }
+  nipCycleIdx=nipCycleIdx%nips.length;
+  const node=nips[nipCycleIdx];
+  nipCycleIdx++;
+  selectNode(node.id);
+  setTimeout(()=>{
+    const el=document.querySelector(`[data-node="${node.id}"]`);
+    if(el)el.scrollIntoView({behavior:'smooth',block:'center',inline:'center'});
+  },50);
+  toast(`⚠ ${nipCycleIdx} of ${nips.length}: ${(node.firstName+' '+node.lastName).trim()||node.email} — not in Perigee`,'warn');
 }
 
 function exportExcel(){
