@@ -828,7 +828,11 @@ function copyText(txt){
     el.select();document.execCommand('copy');document.body.removeChild(el);toast('Copied ✓','info');
   });
 }
-window.addEventListener('scroll',()=>document.querySelectorAll('.ac-list.open').forEach(el=>el.classList.remove('open')),true);
+window.addEventListener('scroll',e=>{
+  // Don't close dropdown if the scroll is happening inside the dropdown itself
+  if(e.target&&e.target.closest&&e.target.closest('.ac-list'))return;
+  document.querySelectorAll('.ac-list.open').forEach(el=>el.classList.remove('open'));
+},true);
 window.addEventListener('resize',()=>document.querySelectorAll('.ac-list.open').forEach(el=>el.classList.remove('open')));
 
 // ─── PAN TO NAVIGATE ────────────────────────────────────────────────────────
