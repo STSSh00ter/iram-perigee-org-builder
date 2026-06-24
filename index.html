@@ -38,7 +38,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#eef2f7;color:#1e293b;he
 .filter-count{font-size:11px;color:#94a3b8;margin-left:auto}
 .filter-count b{color:#2563eb}
 .main{display:flex;flex:1;overflow:hidden;position:relative}
-.tree-panel{flex:1;overflow:auto;padding:28px 32px;position:relative;cursor:grab}
+.tree-panel{flex:1;overflow:auto;padding:28px 32px;position:relative;cursor:grab;touch-action:none}
 .tree-panel.panning{cursor:grabbing;user-select:none}
 /* Zoom controls — float over the tree, stay put while it scrolls */
 .zoom-controls{position:absolute;left:16px;bottom:16px;z-index:50;display:flex;align-items:center;gap:3px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.16);padding:4px}
@@ -1119,21 +1119,49 @@ window.addEventListener('resize',()=>document.querySelectorAll('.ac-list.open').
     if(!panning)return;
     panning=false;panel.classList.remove('panning');
   });
-  // Touch support
+  // Touch support: 1 finger = pan, 2 fingers = pinch-zoom (anchored on the pinch midpoint)
+  let pinching=false,pinchDist=0,pinchZoom=1;
+  const touchDist=(a,b)=>Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);
   panel.addEventListener('touchstart',e=>{
+    if(e.touches.length>=2){
+      pinching=true;panning=false;
+      pinchDist=touchDist(e.touches[0],e.touches[1]);
+      pinchZoom=treeZoom;
+      e.preventDefault();
+      return;
+    }
     if(e.target.closest(IGNORE))return;
     const t=e.touches[0];
     panning=true;startX=t.clientX;startY=t.clientY;
     scrollX=panel.scrollLeft;scrollY=panel.scrollTop;
-  },{passive:true});
+  },{passive:false});
   panel.addEventListener('touchmove',e=>{
+    if(pinching&&e.touches.length>=2){
+      e.preventDefault();
+      const d=touchDist(e.touches[0],e.touches[1]);
+      if(pinchDist>0){
+        const old=treeZoom;
+        setZoom(pinchZoom*(d/pinchDist));
+        if(treeZoom!==old){
+          const ratio=treeZoom/old,rect=panel.getBoundingClientRect();
+          const cx=(e.touches[0].clientX+e.touches[1].clientX)/2-rect.left;
+          const cy=(e.touches[0].clientY+e.touches[1].clientY)/2-rect.top;
+          panel.scrollLeft+=(cx+panel.scrollLeft)*(ratio-1);
+          panel.scrollTop+=(cy+panel.scrollTop)*(ratio-1);
+        }
+      }
+      return;
+    }
     if(!panning)return;
     const t=e.touches[0];
     panel.scrollLeft=scrollX-(t.clientX-startX);
     panel.scrollTop=scrollY-(t.clientY-startY);
     e.preventDefault();
   },{passive:false});
-  panel.addEventListener('touchend',()=>{panning=false;});
+  panel.addEventListener('touchend',e=>{
+    if(e.touches.length<2)pinching=false;
+    if(e.touches.length===0)panning=false;
+  });
   // Ctrl + scroll wheel = zoom, anchored on the cursor
   panel.addEventListener('wheel',e=>{
     if(!e.ctrlKey)return;
