@@ -1616,23 +1616,37 @@ async function forcePush(){
   _pushing=false;
 }
 
-let _realtimeCh=null;
+let _realtimeCh=null,_lastCloudAt=null;
 function subscribeRealtime(){
   if(!_supa||_realtimeCh)return;
+  // Listen to all changes; filter in JS (free-tier server-side filters are unreliable)
   _realtimeCh=_supa.channel('org-live')
-    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'iram_org_state',filter:'id=eq.main'},payload=>{
+    .on('postgres_changes',{event:'*',schema:'public',table:'iram_org_state'},payload=>{
       if(_pushing)return;
-      if(payload.new&&payload.new.updated_by===getDeviceId())return;
-      loadFromCloud().then(ok=>{if(ok){render();toast('Tree updated from another device ↓','info');}});
-    })
-    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'iram_org_state',filter:'id=eq.perigee'},payload=>{
-      if(_pushing)return;
-      if(payload.new&&payload.new.updated_by===getDeviceId())return;
-      loadPerigeeFromCloud().then(ok=>{if(ok){orgNodes.forEach(n=>{n.notInPerigee=!!n.email&&!findPerigeeUser(n.email);});render();}});
+      const row=payload.new||{};
+      if(row.updated_by===getDeviceId())return;
+      if(row.id==='main'){
+        loadFromCloud().then(ok=>{if(ok){render();toast('Tree updated ↓','info');}});
+      }else if(row.id==='perigee'){
+        loadPerigeeFromCloud().then(ok=>{if(ok){orgNodes.forEach(n=>{n.notInPerigee=!!n.email&&!findPerigeeUser(n.email);});render();}});
+      }
     })
     .subscribe(status=>{
       if(status==='SUBSCRIBED')setSyncStatus('☁ live','#059669');
     });
+  // Polling fallback: check every 60 s in case realtime misses an event
+  setInterval(async()=>{
+    if(_pushing||!_supa)return;
+    try{
+      const{data}=await _supa.from('iram_org_state').select('updated_at,updated_by').eq('id','main').single();
+      if(!data)return;
+      if(data.updated_by===getDeviceId())return;
+      if(data.updated_at===_lastCloudAt)return;
+      _lastCloudAt=data.updated_at;
+      const ok=await loadFromCloud();
+      if(ok){render();toast('Tree synced from cloud ↓','info');}
+    }catch(e){}
+  },60000);
 }
 
 function renderSyncTab(){
