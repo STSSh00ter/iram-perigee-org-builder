@@ -232,9 +232,7 @@ ul.grp-children::before{border-left-style:dashed!important;border-color:#94a3b8!
   <div class="hdr-actions">
     <button class="btn btn-ghost btn-mob-hide" onclick="loadPerigeeFile()">📂 Load Perigee Users</button>
     <button class="btn btn-ghost btn-mob-hide" onclick="addRootNode()">＋ Add Root Person</button>
-    <button class="btn btn-ghost btn-sm btn-mob-hide" onclick="importState()" title="Import a shared tree state file">📥 Import Tree</button>
     <button class="btn btn-ghost btn-sm btn-mob-hide" onclick="exportState()" title="Export tree for sharing with others">📤 Export Tree</button>
-    <button class="btn btn-warning btn-sm" onclick="clearAll()">🗑 Clear All</button>
     <button class="btn btn-ghost btn-sm" onclick="openAdmin()">🔒 Admin</button>
     <button class="btn btn-sm" id="btnPush" onclick="forcePush()" style="background:#0ea5e9;color:#fff" title="Push current tree to Supabase and notify all open devices">☁ Push to All</button>
     <button class="btn btn-success" onclick="exportExcel()">⬇ Export Excel</button>
@@ -314,6 +312,7 @@ ul.grp-children::before{border-left-style:dashed!important;border-color:#94a3b8!
         <button id="adminTabLog" class="admin-tab active" onclick="switchAdminTab('log')">📋 Audit Log</button>
         <button id="adminTabTrash" class="admin-tab" onclick="switchAdminTab('trash')">🗑 Deleted Items</button>
         <button id="adminTabSync" class="admin-tab" onclick="switchAdminTab('sync')">☁ Cloud Sync</button>
+        <button id="adminTabData" class="admin-tab" onclick="switchAdminTab('data')">🗂 Data</button>
       </div>
       <div class="admin-content" id="adminContent"></div>
     </div>
@@ -1297,7 +1296,9 @@ function switchAdminTab(tab){
   document.getElementById('adminTabLog').className='admin-tab'+(tab==='log'?' active':'');
   document.getElementById('adminTabTrash').className='admin-tab'+(tab==='trash'?' active':'');
   document.getElementById('adminTabSync').className='admin-tab'+(tab==='sync'?' active':'');
+  document.getElementById('adminTabData').className='admin-tab'+(tab==='data'?' active':'');
   if(tab==='sync'){renderSyncTab();return;}
+  if(tab==='data'){renderDataTab();return;}
   const log=getAuditLog(),trash=getTrash();
   if(tab==='log'){
     const rows=log.slice().reverse().slice(0,300);
@@ -1651,6 +1652,23 @@ function subscribeRealtime(){
       if(ok){render();toast('Tree synced from cloud ↓','info');}
     }catch(e){}
   },60000);
+}
+
+function renderDataTab(){
+  const tSet=new Set(orgNodes.flatMap(n=>[n.teamName,...(n.extraTeams||[])]).filter(Boolean));
+  document.getElementById('adminContent').innerHTML=`
+    <div style="display:flex;flex-direction:column;gap:18px">
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px 14px">
+        <div style="font-size:13px;font-weight:700;margin-bottom:6px">📥 Import Tree</div>
+        <p style="font-size:11px;color:#64748b;margin-bottom:10px;line-height:1.5">Load a tree from a shared <b>.json</b> export file. This replaces the current tree (a backup of the current tree is saved to Deleted Items first).</p>
+        <button class="btn btn-sm" style="background:#2563eb;color:#fff" onclick="closeAdmin();importState()">📥 Choose file & import…</button>
+      </div>
+      <div style="background:#fff7ed;border:1px solid #fb923c;border-radius:8px;padding:12px 14px">
+        <div style="font-size:13px;font-weight:700;margin-bottom:6px;color:#9a3412">🗑 Clear All</div>
+        <p style="font-size:11px;color:#7c2d12;margin-bottom:10px;line-height:1.5">Removes <b>all ${orgNodes.length} node(s)</b> across <b>${tSet.size} team(s)</b> from the tree. Nodes are soft-deleted and recoverable from <b>Deleted Items</b>. This does not delete Perigee users.</p>
+        <button class="btn btn-sm btn-warning" onclick="closeAdmin();clearAll()">🗑 Clear entire tree…</button>
+      </div>
+    </div>`;
 }
 
 function renderSyncTab(){
