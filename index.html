@@ -95,6 +95,9 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#eef2f7;color:#1e293b;he
 .node-no-email{font-size:9px;color:#dc2626;margin-top:3px;padding-left:10px;font-weight:700;opacity:.7}
 .node-leave{font-size:9px;color:#7c3aed;margin-top:2px;padding-left:10px;font-weight:600}
 .node-slot{position:relative;display:inline-block}
+/* Upward arrow on each connector line — shows "reports to" direction */
+.node-slot::before{content:'';position:absolute;top:-10px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-bottom:7px solid #64748b;z-index:5;pointer-events:none}
+.node-slot.root-slot::before{display:none}
 .node-add-btn{position:absolute;bottom:-14px;left:50%;transform:translateX(-50%);width:28px;height:28px;border-radius:50%;background:#2563eb;color:#fff;border:2px solid #fff;cursor:pointer;font-size:18px;line-height:1;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(37,99,235,.5);z-index:10;transition:.15s;opacity:0;pointer-events:none}
 .node-slot:hover .node-add-btn{opacity:1;pointer-events:auto}
 .node-add-btn:hover{background:#1d4ed8;transform:translateX(-50%) scale(1.12)}
@@ -112,9 +115,8 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#eef2f7;color:#1e293b;he
 .node-card.is-group.selected{border-color:#2563eb;border-style:dashed;box-shadow:0 0 0 3px rgba(37,99,235,.18)}
 .node-card.is-group .node-name{font-size:11px;font-weight:800;color:#475569;letter-spacing:.04em;text-transform:uppercase;padding-left:0;margin-top:0}
 .node-card.is-group .drag-handle{display:none}
-/* Dashed horizontal arms only to group child nodes — vertical connectors stay solid */
-li.grp-child::before,li.grp-child::after{border-top-style:dashed!important;border-top-color:#94a3b8!important}
-li.grp-child::before{border-right-style:dashed!important;border-right-color:#94a3b8!important}
+/* Group node: horizontal arms stay solid — only the vertical stem DOWN to group's children is dashed */
+ul.grp-children::before{border-left-style:dashed!important;border-color:#94a3b8!important}
 /* Edit panel */
 .edit-panel{width:340px;background:#fff;border-left:1px solid #e2e8f0;display:flex;flex-direction:column;overflow:hidden;flex-shrink:0;transition:width .25s ease}
 .edit-panel.collapsed{width:36px}
@@ -965,9 +967,9 @@ function renderTreeNode(nodeId,visibleIds,matchIds){
     const isDimmed=visibleIds&&matchIds&&!matchIds.has(nodeId);
     const provs=getNodeProvinces(node);
     let childrenHTML='';
-    if(visibleCh.length)childrenHTML=`<ul>${visibleCh.map(c=>liWrap(c.id,visibleIds,matchIds)).join('')}</ul>`;
+    if(visibleCh.length)childrenHTML=`<ul class="grp-children">${visibleCh.map(c=>liWrap(c.id,visibleIds,matchIds)).join('')}</ul>`;
     return`<div>
-      <div class="node-slot">
+      <div class="node-slot${!node.parentId?' root-slot':''}">
       <button class="node-shift node-shift-l" onclick="event.stopPropagation();shiftNode('${nodeId}',-1)" title="Move left">◀</button>
       <div class="node-card is-group${isSel?' selected':''}${isDimmed?' dimmed':''}"
         data-node="${nodeId}" draggable="true"
@@ -992,7 +994,7 @@ function renderTreeNode(nodeId,visibleIds,matchIds){
   let childrenHTML='';
   if(visibleCh.length)childrenHTML=`<ul>${visibleCh.map(c=>liWrap(c.id,visibleIds,matchIds)).join('')}</ul>`;
   return`<div>
-    <div class="node-slot">
+    <div class="node-slot${!node.parentId?' root-slot':''}">
     <button class="node-shift node-shift-l" onclick="event.stopPropagation();shiftNode('${nodeId}',-1)" title="Move left">◀</button>
     <div class="node-card${!node.parentId?' is-root':''}${isSel?' selected':''}${isNip?' nip':''}${isDimmed?' dimmed':''}"
       data-node="${nodeId}" draggable="true"
