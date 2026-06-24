@@ -236,6 +236,7 @@ ul.grp-children::before{border-left-style:dashed!important;border-color:#94a3b8!
     <button class="btn btn-ghost btn-sm btn-mob-hide" onclick="exportState()" title="Export tree for sharing with others">📤 Export Tree</button>
     <button class="btn btn-warning btn-sm" onclick="clearAll()">🗑 Clear All</button>
     <button class="btn btn-ghost btn-sm" onclick="openAdmin()">🔒 Admin</button>
+    <button class="btn btn-sm" id="btnPush" onclick="forcePush()" style="background:#0ea5e9;color:#fff" title="Push current tree to Supabase and notify all open devices">☁ Push to All</button>
     <button class="btn btn-success" onclick="exportExcel()">⬇ Export Excel</button>
     <button class="btn btn-success" onclick="exportPDF()" id="btnPDF">🖨 Export PDF</button>
   </div>
@@ -1590,6 +1591,49 @@ async function manualSync(){
   else toast('Could not reach cloud','error');
 }
 
+let _pushing=false;
+async function forcePush(){
+  if(!_supa){toast('Cloud sync not configured — set it up in Admin → Cloud Sync','warn');return;}
+  if(_pushing)return;
+  _pushing=true;
+  const btn=document.getElementById('btnPush');
+  if(btn){btn.disabled=true;btn.textContent='☁ Pushing…';}
+  setSyncStatus('☁ pushing…','#f59e0b');
+  try{
+    const slim=perigeeUsers.map(u=>({email:u.email,firstName:u.firstName,lastName:u.lastName,status:u.status,access:u.access}));
+    await Promise.all([
+      _supa.from('iram_org_state').upsert({id:'main',nodes:orgNodes,updated_at:new Date().toISOString(),updated_by:getDeviceId()},{onConflict:'id'}),
+      slim.length?_supa.from('iram_org_state').upsert({id:'perigee',nodes:slim,updated_at:new Date().toISOString(),updated_by:getDeviceId()},{onConflict:'id'}):Promise.resolve()
+    ]);
+    setSyncStatus('☁ synced '+new Date().toLocaleTimeString(),'#059669');
+    toast('Pushed — other devices will update automatically ✓','success');
+  }catch(e){
+    setSyncStatus('☁ push failed','#dc2626');
+    toast('Push failed: '+e.message,'error');
+  }
+  if(btn){btn.disabled=false;btn.textContent='☁ Push to All';}
+  _pushing=false;
+}
+
+let _realtimeCh=null;
+function subscribeRealtime(){
+  if(!_supa||_realtimeCh)return;
+  _realtimeCh=_supa.channel('org-live')
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'iram_org_state',filter:'id=eq.main'},payload=>{
+      if(_pushing)return;
+      if(payload.new&&payload.new.updated_by===getDeviceId())return;
+      loadFromCloud().then(ok=>{if(ok){render();toast('Tree updated from another device ↓','info');}});
+    })
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'iram_org_state',filter:'id=eq.perigee'},payload=>{
+      if(_pushing)return;
+      if(payload.new&&payload.new.updated_by===getDeviceId())return;
+      loadPerigeeFromCloud().then(ok=>{if(ok){orgNodes.forEach(n=>{n.notInPerigee=!!n.email&&!findPerigeeUser(n.email);});render();}});
+    })
+    .subscribe(status=>{
+      if(status==='SUBSCRIBED')setSyncStatus('☁ live','#059669');
+    });
+}
+
 function renderSyncTab(){
   const cfg=getSupaCfg()||{};
   const connected=!!_supa;
@@ -1675,6 +1719,7 @@ if(initSupabase()){
   Promise.all([loadFromCloud(),loadPerigeeFromCloud()]).then(([treeOk,perigeeOk])=>{
     if(perigeeOk)orgNodes.forEach(n=>{n.notInPerigee=!!n.email&&!findPerigeeUser(n.email);});
     if(treeOk||perigeeOk)render();
+    subscribeRealtime();
   });
 }
 </script>
