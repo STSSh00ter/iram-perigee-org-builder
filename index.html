@@ -117,11 +117,9 @@ body.compact-view .node-name{font-size:13px;margin-top:6px;padding-left:0;line-h
 body.compact-view .node-team{font-size:10px;margin-top:3px;padding-left:0}
 body.compact-view .node-card{text-align:center}
 body.compact-view .node-badge{font-size:8px;padding:2px 8px}
-@media(max-width:700px){
-  body.compact-view .node-card{width:128px}
-  body.compact-view .node-card.is-root{width:148px !important}
-  body.compact-view .node-name{font-size:12px}
-}
+body.mobile-layout.compact-view .node-card{width:128px}
+body.mobile-layout.compact-view .node-card.is-root{width:148px !important}
+body.mobile-layout.compact-view .node-name{font-size:12px}
 /* RESIGNED — hand-painted red brush X slapped across the card */
 .node-card.is-resigned{background:#fff5f5}
 .node-card.is-resigned .node-name,.node-card.is-resigned .node-title{text-decoration:line-through;text-decoration-color:rgba(220,38,38,.55);opacity:.78}
@@ -245,30 +243,51 @@ ul.grp-children::before{border-left-style:dashed!important;border-color:#94a3b8!
 .badge-active{background:#059669}.badge-inactive{background:#94a3b8}
 ::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:#f1f5f9}
 ::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:3px}::-webkit-scrollbar-thumb:hover{background:#94a3b8}
-@media(max-width:700px){
-  .hdr{height:auto;min-height:52px;flex-wrap:wrap;padding:8px 10px;gap:6px}
-  .hdr-sub{display:none!important}
-  .hdr-title{font-size:13px}
-  .hdr-actions{flex-wrap:wrap;gap:4px;width:100%}
-  .hdr-actions .btn{font-size:10px;padding:5px 8px;gap:4px}
-  .btn-mob-hide{display:none!important}
-  .status-bar{display:none}
-  .filter-bar{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:6px 10px;gap:6px}
-  .filter-bar::-webkit-scrollbar{display:none}
-  .filter-count{display:none}
-  .filter-sel{max-width:100px;font-size:10px}
-  .main{flex-direction:column}
-  .tree-panel{flex:1;min-height:0}
-  .edit-panel{width:100%!important;max-height:45vh;border-left:none;border-top:2px solid #e2e8f0;overflow-y:auto;flex-shrink:0}
-  .edit-panel.collapsed{max-height:36px;width:100%!important}
-  .edit-panel.collapsed .ep-header{padding:8px 12px;justify-content:space-between;flex-direction:row}
-  .edit-panel.collapsed .ep-toggle{font-size:14px}
-  .ep-header h3{font-size:13px}
-  .node-card{width:150px}
-  .node-card.is-root{width:170px}
-  /* keep zoom controls clear of the bottom edit drawer */
-  .zoom-controls{left:8px;top:8px;bottom:auto}
-}
+/* ============ MOBILE LAYOUT — toggled by JS via screen aspect ratio + width ============ */
+body.mobile-layout .hdr{height:auto;min-height:48px;flex-wrap:wrap;padding:6px 10px;gap:6px}
+body.mobile-layout .hdr-logo{font-size:17px}
+body.mobile-layout .hdr-sub{display:none!important}
+body.mobile-layout .hdr-title{font-size:13px}
+body.mobile-layout .hdr>div:nth-child(2){flex:1;min-width:0}
+/* header actions become a single horizontal swipe strip */
+body.mobile-layout .hdr-actions{order:3;width:100%;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;gap:6px;padding-bottom:2px;scrollbar-width:none}
+body.mobile-layout .hdr-actions::-webkit-scrollbar{display:none}
+body.mobile-layout .hdr-actions .btn{font-size:11px;padding:8px 11px;gap:5px;flex:0 0 auto;white-space:nowrap}
+body.mobile-layout .btn-mob-hide{display:none!important}
+body.mobile-layout .status-bar{display:none}
+/* filter bar: swipe strip with bigger touch targets */
+body.mobile-layout .filter-bar{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:7px 10px;gap:7px;scrollbar-width:none}
+body.mobile-layout .filter-bar::-webkit-scrollbar{display:none}
+body.mobile-layout .filter-label{flex:0 0 auto}
+body.mobile-layout .filter-pill{flex:0 0 auto;padding:8px 14px;font-size:12px}
+body.mobile-layout .filter-count{display:none}
+body.mobile-layout .filter-sel{flex:0 0 auto;max-width:140px;font-size:12px;padding:8px 9px}
+/* stack: tree on top, edit panel as a bottom sheet */
+body.mobile-layout .main{flex-direction:column}
+body.mobile-layout .tree-panel{flex:1;min-height:0;padding:16px}
+body.mobile-layout .edit-panel{width:100%!important;max-height:52vh;border-left:none;border-top:2px solid #cbd5e1;overflow-y:auto;flex-shrink:0;box-shadow:0 -6px 22px rgba(0,0,0,.14)}
+body.mobile-layout .edit-panel.collapsed{max-height:44px;width:100%!important}
+body.mobile-layout .edit-panel.collapsed .ep-header{padding:11px 14px;justify-content:space-between;flex-direction:row;align-items:center}
+body.mobile-layout .edit-panel.collapsed .ep-toggle{font-size:16px}
+body.mobile-layout .ep-header h3{font-size:14px}
+body.mobile-layout .ep-body{padding:14px 16px}
+/* bigger, finger-friendly form controls (15px font prevents iOS zoom-on-focus) */
+body.mobile-layout .fc{padding:11px 12px;font-size:15px}
+body.mobile-layout .fl{font-size:11px}
+body.mobile-layout .ep-footer{padding:12px 14px;gap:8px}
+body.mobile-layout .ep-footer .btn{padding:11px 14px;font-size:13px;flex:1 1 auto;justify-content:center}
+body.mobile-layout .prov-chip-lbl{padding:6px 12px;font-size:12px}
+/* show the +/◀▶ controls on the SELECTED node (no hover on touch) */
+body.mobile-layout .node-slot:has(.node-card.selected) .node-add-btn,
+body.mobile-layout .node-slot:has(.node-card.selected) .node-shift{opacity:1;pointer-events:auto}
+body.mobile-layout .node-add-btn{width:32px;height:32px;font-size:20px}
+body.mobile-layout .node-shift{width:27px;height:27px;font-size:13px}
+/* zoom controls clear of the bottom sheet, larger taps */
+body.mobile-layout .zoom-controls{left:10px;top:10px;bottom:auto;padding:5px}
+body.mobile-layout .zoom-btn{width:38px;height:38px;font-size:18px}
+body.mobile-layout .zoom-label{min-width:52px;font-size:13px}
+/* modal fills the small screen */
+body.mobile-layout .modal{width:96vw;max-height:90vh}
 @media print{
   .zoom-controls{display:none!important}
   *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -397,8 +416,23 @@ const PROVINCES=['EC','FS','GP','KZN','LP','MP','NC','NW','WC'];
 const KNOWN_TEAMS=['BLUE POWER','Bosch Automotive','MM Chanel Head+Ops','Team Coastal','Team EC 1','Team EC 2','Team EC 3','Team Free State','Team GP MT','Team GP TT PTA','Team Highveld (MP)','Team Inland','Team KZN 1','Team KZN 2','Team KZN 3','Team KZN 4','Team Limpopo','Team Lowveld (MP)','Team Massbuild JHB','Team MT GP Centurion/Midrand','Team MT GP East/Central','Team MT GP North/West','Team MT GP NW (Potch)','Team MT GP PTA','Team MT GP South Vaal','Team Northen Cape','Team NW RustenB','Team Ops Heads','Team Ops Massbuild','Team RVL','Team WC 1','Team WC 2','Team WC 3','Team WC 4','Team WC 5','Team WC 6'];
 
 let perigeeUsers=[],orgNodes=[],selectedNodeId=null,pendingParentId=null,draggedNodeId=null,filterProvince='',filterTeamName='';
-// Compact view: default ON for small screens unless the user has chosen otherwise
-let compactView=(localStorage.getItem('iram-compact')!==null)?(localStorage.getItem('iram-compact')==='1'):(window.innerWidth<=700);
+// Mobile layout is auto-detected from the screen's aspect ratio + size (re-checked on rotate)
+function isMobileAspect(){
+  const w=window.innerWidth,h=window.innerHeight;
+  const portrait=h>w;                 // tall aspect ratio = phone/tablet held upright
+  const coarse=window.matchMedia&&window.matchMedia('(pointer:coarse)').matches;
+  // any narrow screen, OR a touch device in portrait up to tablet width
+  return w<=820 || (coarse&&portrait&&w<=1024);
+}
+function detectLayout(){
+  const m=isMobileAspect();
+  document.body.classList.toggle('mobile-layout',m);
+  return m;
+}
+window.addEventListener('resize',detectLayout);
+window.addEventListener('orientationchange',()=>setTimeout(detectLayout,120));
+// Compact view: default ON for mobile-shaped screens unless the user has chosen otherwise
+let compactView=(localStorage.getItem('iram-compact')!==null)?(localStorage.getItem('iram-compact')==='1'):isMobileAspect();
 function toggleCompact(){
   compactView=!compactView;
   localStorage.setItem('iram-compact',compactView?'1':'0');
@@ -1886,6 +1920,7 @@ function disconnectSupa(){
 
 // ─── INIT ───────────────────────────────────────────────────────────────────
 loadState();
+detectLayout();
 document.body.classList.toggle('compact-view',compactView);
 if(orgNodes.length===0){orgNodes=getInitialOrg();saveState();}
 render();
