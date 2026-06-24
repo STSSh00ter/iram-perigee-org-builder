@@ -102,6 +102,26 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#eef2f7;color:#1e293b;he
 .node-provs{font-size:9px;color:#059669;margin-top:2px;padding-left:10px;font-weight:700}
 .node-no-email{font-size:9px;color:#dc2626;margin-top:3px;padding-left:10px;font-weight:700;opacity:.7}
 .node-leave{font-size:9px;color:#7c3aed;margin-top:2px;padding-left:10px;font-weight:600}
+/* COMPACT VIEW — strip cards to name + role + team for readability (esp. mobile) */
+body.compact-view .node-card{width:148px;padding:9px 10px 9px 9px}
+body.compact-view .node-card.is-root{width:172px !important}
+body.compact-view .node-email,
+body.compact-view .node-title,
+body.compact-view .node-provs,
+body.compact-view .node-extra-teams,
+body.compact-view .node-assist,
+body.compact-view .node-no-email,
+body.compact-view .node-leave,
+body.compact-view .drag-handle{display:none}
+body.compact-view .node-name{font-size:13px;margin-top:6px;padding-left:0;line-height:1.2}
+body.compact-view .node-team{font-size:10px;margin-top:3px;padding-left:0}
+body.compact-view .node-card{text-align:center}
+body.compact-view .node-badge{font-size:8px;padding:2px 8px}
+@media(max-width:700px){
+  body.compact-view .node-card{width:128px}
+  body.compact-view .node-card.is-root{width:148px !important}
+  body.compact-view .node-name{font-size:12px}
+}
 /* RESIGNED — hand-painted red brush X slapped across the card */
 .node-card.is-resigned{background:#fff5f5}
 .node-card.is-resigned .node-name,.node-card.is-resigned .node-title{text-decoration:line-through;text-decoration-color:rgba(220,38,38,.55);opacity:.78}
@@ -377,6 +397,14 @@ const PROVINCES=['EC','FS','GP','KZN','LP','MP','NC','NW','WC'];
 const KNOWN_TEAMS=['BLUE POWER','Bosch Automotive','MM Chanel Head+Ops','Team Coastal','Team EC 1','Team EC 2','Team EC 3','Team Free State','Team GP MT','Team GP TT PTA','Team Highveld (MP)','Team Inland','Team KZN 1','Team KZN 2','Team KZN 3','Team KZN 4','Team Limpopo','Team Lowveld (MP)','Team Massbuild JHB','Team MT GP Centurion/Midrand','Team MT GP East/Central','Team MT GP North/West','Team MT GP NW (Potch)','Team MT GP PTA','Team MT GP South Vaal','Team Northen Cape','Team NW RustenB','Team Ops Heads','Team Ops Massbuild','Team RVL','Team WC 1','Team WC 2','Team WC 3','Team WC 4','Team WC 5','Team WC 6'];
 
 let perigeeUsers=[],orgNodes=[],selectedNodeId=null,pendingParentId=null,draggedNodeId=null,filterProvince='',filterTeamName='';
+// Compact view: default ON for small screens unless the user has chosen otherwise
+let compactView=(localStorage.getItem('iram-compact')!==null)?(localStorage.getItem('iram-compact')==='1'):(window.innerWidth<=700);
+function toggleCompact(){
+  compactView=!compactView;
+  localStorage.setItem('iram-compact',compactView?'1':'0');
+  document.body.classList.toggle('compact-view',compactView);
+  renderFilterBar();
+}
 
 function saveState(){
   try{localStorage.setItem('iram-org-v5',JSON.stringify(orgNodes));}catch(e){}
@@ -561,6 +589,7 @@ function renderFilterBar(){
     <div class="filter-bar">
       <span class="filter-label">View:</span>
       <button class="filter-pill ${!active?'active':''}" onclick="setFilter('','')">All (${orgNodes.length})</button>
+      <button class="filter-pill ${compactView?'active':''}" onclick="toggleCompact()" title="Compact cards — show name & role only">${compactView?'▣':'▢'} Compact</button>
       ${provs.map(p=>`<button class="filter-pill prov ${filterProvince===p&&!filterTeamName?'active':''}" onclick="setFilter('${p}','')">${p}</button>`).join('')}
       ${teams.length?`<span class="filter-sep">|</span>
         <select class="filter-sel" onchange="setFilter('',this.value)">
@@ -1857,6 +1886,7 @@ function disconnectSupa(){
 
 // ─── INIT ───────────────────────────────────────────────────────────────────
 loadState();
+document.body.classList.toggle('compact-view',compactView);
 if(orgNodes.length===0){orgNodes=getInitialOrg();saveState();}
 render();
 if(initSupabase()){
