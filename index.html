@@ -96,7 +96,17 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#eef2f7;color:#1e293b;he
 .node-add-btn:hover{background:#1d4ed8;transform:translateX(-50%) scale(1.12)}
 .drop-root-zone{border:2px dashed #94a3b8;border-radius:10px;padding:10px 16px;font-size:11px;color:#94a3b8;text-align:center;margin-bottom:16px;transition:.2s;display:none}
 .drop-root-zone.visible{display:block}.drop-root-zone.over{border-color:#059669;color:#059669;background:#f0fdf4}
-.role-reg{background:#7c3aed}.role-chan{background:#c2410c}.role-area{background:#b45309}.role-tl{background:#047857}.role-mem{background:#1d4ed8}
+.role-reg{background:#7c3aed}.role-chan{background:#c2410c}.role-area{background:#b45309}.role-tl{background:#047857}.role-mem{background:#1d4ed8}.role-grp{background:#475569}
+/* Team Group node */
+.node-card.is-group{background:linear-gradient(135deg,#f8fafc,#e8edf4);border:2px dashed #94a3b8;border-radius:20px;padding:8px 16px;width:auto;min-width:140px;max-width:210px;text-align:center;box-shadow:none}
+.node-card.is-group:hover{box-shadow:0 2px 10px rgba(0,0,0,.1);transform:translateY(-1px)}
+.node-card.is-group.selected{border-color:#2563eb;border-style:dashed;box-shadow:0 0 0 3px rgba(37,99,235,.18)}
+.node-card.is-group .node-name{font-size:11px;font-weight:800;color:#475569;letter-spacing:.04em;text-transform:uppercase;padding-left:0;margin-top:0}
+.node-card.is-group .drag-handle{display:none}
+/* Dashed connector lines to group child nodes */
+li.grp-child::before,li.grp-child::after{border-top-style:dashed!important;border-color:#94a3b8!important}
+li.grp-child::before{border-right-style:dashed!important}
+li.grp-child::after{border-left-style:dashed!important}
 /* Edit panel */
 .edit-panel{width:340px;background:#fff;border-left:1px solid #e2e8f0;display:flex;flex-direction:column;overflow:hidden;flex-shrink:0;transition:width .25s ease}
 .edit-panel.collapsed{width:36px}
@@ -274,6 +284,7 @@ const ROLE_TYPES=[
   {v:'AREA_MANAGER',label:'Area Manager',color:'role-area',badge:'Area Manager'},
   {v:'TEAM_LEADER',label:'Team Leader',color:'role-tl',badge:'Team Leader'},
   {v:'MEMBER',label:'Team Member',color:'role-mem',badge:'Member'},
+  {v:'TEAM_GROUP',label:'── Team Group (visual divider)',color:'role-grp',badge:'Team Group'},
 ];
 const LEADER_ROLES=['REGIONAL_MANAGER','CHANNEL_HEAD','AREA_MANAGER','TEAM_LEADER'];
 const JOB_TITLES=['Brand Ambassador','General Merchandiser','Roaming Merchandiser','Field Agent','Representative','RVL Rep','Team Leader','Area Manager','Channel Manager','Key Account Manager','Operations Manager','Regional Manager','Channel Head','CRM Manager','Ops Lead','Learner','Promoter','Vacant'];
@@ -433,7 +444,8 @@ function addRootNode(){openModal(null);}
 function addChildNode(parentId){if(!parentId)return;openModal(parentId);}
 function insertNode(node){
   orgNodes.push(node);logAudit('ADD',node);saveState();selectedNodeId=node.id;render();
-  toast((node.firstName||node.email||'Person')+' added'+(node.notInPerigee?' ⚠️ Not in Perigee':''),'success');
+  const label=node.roleType==='TEAM_GROUP'?('📁 '+(node.teamName||'Team Group')):(node.firstName||node.email||'Person');
+  toast(label+' added'+(node.notInPerigee?' ⚠️ Not in Perigee':''),'success');
 }
 let pendingDeleteId=null;
 function deleteNode(id){
@@ -550,9 +562,12 @@ function openModal(parentId){
 function closeModal(){document.getElementById('addModal').classList.remove('open');pendingParentId=null;}
 function confirmModal(){
   const node=makeNode(pendingParentId);
-  const email=(document.getElementById('modal_email').value||'').trim().toLowerCase();
-  if(!email){toast('Email is required','error');return;}
-  if(orgNodes.find(n=>n.email===email)){if(!confirm(`"${email}" is already in the tree. Add duplicate?`))return;}
+  const roleType=document.getElementById('modal_roleType').value;
+  if(roleType!=='TEAM_GROUP'){
+    const email=(document.getElementById('modal_email').value||'').trim().toLowerCase();
+    if(!email){toast('Email is required','error');return;}
+    if(orgNodes.find(n=>n.email===email)){if(!confirm(`"${email}" is already in the tree. Add duplicate?`))return;}
+  }
   collectFormInto(node,'modal_');closeModal();insertNode(node);
 }
 
@@ -564,8 +579,11 @@ function selectNode(id){
 }
 function saveEdit(){
   if(!selectedNodeId)return;const node=getNode(selectedNodeId);if(!node)return;
-  const email=(document.getElementById('ep_email').value||'').trim().toLowerCase();
-  if(!email){toast('Email is required','error');return;}
+  const roleType=document.getElementById('ep_roleType').value;
+  if(roleType!=='TEAM_GROUP'){
+    const email=(document.getElementById('ep_email').value||'').trim().toLowerCase();
+    if(!email){toast('Email is required','error');return;}
+  }
   collectFormInto(node,'ep_');logAudit('UPDATE',node);saveState();render();toast('Saved ✓','success');
   selectNode(selectedNodeId);
 }
@@ -580,11 +598,19 @@ function refreshAncestorInfo(){
 }
 
 function collectFormInto(node,pfx){
+  node.roleType=document.getElementById(pfx+'roleType').value;
+  if(node.roleType==='TEAM_GROUP'){
+    node.email='';node.firstName='';node.lastName='';node.jobTitle='';
+    node.teamName=(document.getElementById(pfx+'teamName').value||'').trim();
+    node.assignedProvinces=PROVINCES.filter(p=>{const cb=document.getElementById(pfx+'prov_'+p);return cb&&cb.checked;}).join(',');
+    node.extraTeams=[];node.assistingNote='';node.notInPerigee=false;
+    node.leaveType='';node.leaveStart='';node.leaveEnd='';
+    return;
+  }
   node.email=(document.getElementById(pfx+'email').value||'').trim().toLowerCase();
   node.firstName=(document.getElementById(pfx+'firstName').value||'').trim();
   node.lastName=(document.getElementById(pfx+'lastName').value||'').trim();
   node.jobTitle=document.getElementById(pfx+'jobTitle').value;
-  node.roleType=document.getElementById(pfx+'roleType').value;
   node.teamName=(document.getElementById(pfx+'teamName').value||'').trim();
   node.assignedProvinces=PROVINCES.filter(p=>{const cb=document.getElementById(pfx+'prov_'+p);return cb&&cb.checked;}).join(',');
   // Extra teams only for leader roles; clear for MEMBER
@@ -614,10 +640,15 @@ function collectFormInto(node,pfx){
 function onRoleChange(pfx){
   const role=document.getElementById(pfx+'roleType').value;
   const isLeader=isLeaderRole(role);
+  const isGroup=role==='TEAM_GROUP';
   const es=document.getElementById(pfx+'extraTeamsSection');
   const ns=document.getElementById(pfx+'assistNoteSection');
-  if(es)es.style.display=isLeader?'':'none';
-  if(ns)ns.style.display=isLeader?'none':'';
+  const ids=document.getElementById(pfx+'identitySection');
+  const ls=document.getElementById(pfx+'leaveSection');
+  if(es)es.style.display=(isLeader&&!isGroup)?'':'none';
+  if(ns)ns.style.display=(isLeader||isGroup)?'none':'';
+  if(ids)ids.style.display=isGroup?'none':'';
+  if(ls)ls.style.display=isGroup?'none':'';
 }
 
 function buildFormHTML(node,pfx){
@@ -629,6 +660,7 @@ function buildFormHTML(node,pfx){
   const nodeExtra=node.extraTeams||[];
   const teams=allTeamNames();
   const isLeader=isLeaderRole(node.roleType);
+  const isGroup=node.roleType==='TEAM_GROUP';
   const provChips=PROVINCES.map(p=>`
     <label class="prov-chip">
       <input type="checkbox" id="${pfx}prov_${p}" value="${p}" ${nodeProv.includes(p)?'checked':''}>
@@ -642,6 +674,19 @@ function buildFormHTML(node,pfx){
   const nipEmailHref=`mailto:${NIP_EMAIL}?cc=HR@iram.co.za&subject=${nipSubject}&body=${nipEmailBody}`;
   const nipWaHref=`https://wa.me/${NIP_WA}?text=${encodeURIComponent(`Hi Laurette 👋\n\nPlease add the following person to Perigee:\n\n👤 *${nipName}*\n📧 ${node.email||'—'}\n💼 ${node.jobTitle||'—'}\n🏷 Team: ${node.teamName||'—'}\n📍 ${node.assignedProvinces||'—'}\n\nThank you!`)}`;
   return`
+    <div class="section-div">Role &amp; Team</div>
+    <div class="fg"><label class="fl">Role Type *</label>
+      <select id="${pfx}roleType" class="fc" onchange="onRoleChange('${pfx}')">${roleOpts}</select>
+    </div>
+    <div class="fg"><label class="fl">Team Name ${isGroup?'*':''}</label>
+      <input id="${pfx}teamName" class="fc" placeholder="e.g. Team KZN Outlying" value="${node.teamName}" list="${pfx}teamList">
+      <datalist id="${pfx}teamList">${teams.map(t=>`<option value="${t}">`).join('')}</datalist>
+    </div>
+    <div class="fg">
+      <label class="fl">Assigned Province(s)</label>
+      <div class="prov-chip-group">${provChips}</div>
+    </div>
+    <div id="${pfx}identitySection" style="display:${isGroup?'none':''}">
     <div class="section-div">Identity</div>
     <div class="fg ac-wrap">
       <label class="fl">Email *</label>
@@ -681,24 +726,17 @@ function buildFormHTML(node,pfx){
         <div id="${pfx}lnAcList" class="ac-list"></div>
       </div>
     </div>
-    <div class="section-div">Role &amp; Team</div>
-    <div class="fg"><label class="fl">Role Type *</label>
-      <select id="${pfx}roleType" class="fc" onchange="onRoleChange('${pfx}')">${roleOpts}</select>
-    </div>
     <div class="fg"><label class="fl">Job Title</label>
       <select id="${pfx}jobTitle" class="fc"><option value="">— Select —</option>${jtOpts}</select>
     </div>
-    <div class="fg"><label class="fl">Primary Team</label>
-      <input id="${pfx}teamName" class="fc" placeholder="e.g. Team KZN 1" value="${node.teamName}" list="${pfx}teamList">
-      <datalist id="${pfx}teamList">${teams.map(t=>`<option value="${t}">`).join('')}</datalist>
     </div>
-    <div id="${pfx}extraTeamsSection" style="display:${isLeader?'':'none'}">
+    <div id="${pfx}extraTeamsSection" style="display:${(isLeader&&!isGroup)?'':'none'}">
       <div class="fg">
         <label class="fl">Also Team Leader For <span style="font-weight:400;text-transform:none">(Ctrl+click multi)</span></label>
         <select id="${pfx}extraTeams" class="extra-teams-select" multiple>${extraOpts}</select>
       </div>
     </div>
-    <div id="${pfx}assistNoteSection" style="display:${isLeader?'none':''}">
+    <div id="${pfx}assistNoteSection" style="display:${(isLeader||isGroup)?'none':''}">
       <div class="conflict-note">
         <b>Team Membership Rule</b>
         A team member belongs to exactly one team. To note cross-team assistance, use the field below — it's informational only and doesn't generate extra export rows.
@@ -707,10 +745,7 @@ function buildFormHTML(node,pfx){
         <input id="${pfx}assistingNote" class="fc" placeholder="e.g. Assisting Team KZN 2 during peak season" value="${node.assistingNote||''}">
       </div>
     </div>
-    <div class="fg">
-      <label class="fl">Assigned Province(s)</label>
-      <div class="prov-chip-group">${provChips}</div>
-    </div>
+    <div id="${pfx}leaveSection" style="display:${isGroup?'none':''}">
     <div class="section-div">Leave (future dates only)</div>
     <div class="fg">
       <label class="fl">Leave Type</label>
@@ -737,6 +772,7 @@ function buildFormHTML(node,pfx){
           <input type="date" id="${pfx}leaveEnd" class="fc" min="${node.leaveStart||todayStr()}" value="${node.leaveEnd||''}">
         </div>
       </div>
+    </div>
     </div>
     ${pfx.startsWith('ep_')?`
       <div class="section-div">Reports To</div>
@@ -876,18 +912,45 @@ window.addEventListener('resize',()=>document.querySelectorAll('.ac-list.open').
   panel.addEventListener('touchend',()=>{panning=false;});
 })();
 
+function liWrap(childId,visibleIds,matchIds){
+  const cn=getNode(childId);
+  const cls=cn&&cn.roleType==='TEAM_GROUP'?' class="grp-child"':'';
+  return`<li${cls}>${renderTreeNode(childId,visibleIds,matchIds)}</li>`;
+}
 function renderTreeNode(nodeId,visibleIds,matchIds){
   const node=getNode(nodeId);if(!node)return'';
+  const isSel=selectedNodeId===nodeId;
+  const allCh=getChildren(nodeId);
+  const visibleCh=visibleIds?allCh.filter(c=>visibleIds.has(c.id)):allCh;
+  // ── Team Group: compact header card with dashed connector ──
+  if(node.roleType==='TEAM_GROUP'){
+    const isDimmed=visibleIds&&matchIds&&!matchIds.has(nodeId);
+    const provs=getNodeProvinces(node);
+    let childrenHTML='';
+    if(visibleCh.length)childrenHTML=`<ul>${visibleCh.map(c=>liWrap(c.id,visibleIds,matchIds)).join('')}</ul>`;
+    return`<div>
+      <div class="node-slot">
+      <div class="node-card is-group${isSel?' selected':''}${isDimmed?' dimmed':''}"
+        data-node="${nodeId}" draggable="true"
+        ondragstart="onDragStart(event,'${nodeId}')" ondragover="onDragOver(event,'${nodeId}')"
+        ondragleave="onDragLeave(event,'${nodeId}')" ondrop="onDrop(event,'${nodeId}')"
+        ondragend="onDragEnd()" onclick="selectNode('${nodeId}')">
+        <div class="node-name">📁 ${node.teamName||'(team group)'}</div>
+        ${provs.length?`<div class="node-provs" style="text-align:center;padding-left:0;margin-top:4px">${provs.join(' · ')}</div>`:''}
+      </div>
+      <button class="node-add-btn" onclick="event.stopPropagation();addChildNode('${nodeId}')" title="Add member">+</button>
+      </div>
+      ${childrenHTML}
+    </div>`;
+  }
   const ri=getRoleInfo(node.roleType);
-  const isSel=selectedNodeId===nodeId,isNip=node.notInPerigee;
+  const isNip=node.notInPerigee;
   const isDimmed=visibleIds&&matchIds&&!matchIds.has(nodeId);
   const dispName=node.firstName?(node.firstName+(node.lastName?' '+node.lastName:'')):(node.email||'(unnamed)');
   const provs=getNodeProvinces(node);const extras=node.extraTeams||[];
-  const allCh=getChildren(nodeId);
-  const visibleCh=visibleIds?allCh.filter(c=>visibleIds.has(c.id)):allCh;
   const hiddenCount=allCh.length-visibleCh.length;
   let childrenHTML='';
-  if(visibleCh.length)childrenHTML=`<ul>${visibleCh.map(c=>`<li>${renderTreeNode(c.id,visibleIds,matchIds)}</li>`).join('')}</ul>`;
+  if(visibleCh.length)childrenHTML=`<ul>${visibleCh.map(c=>liWrap(c.id,visibleIds,matchIds)).join('')}</ul>`;
   return`<div>
     <div class="node-slot">
     <div class="node-card${isSel?' selected':''}${isNip?' nip':''}${isDimmed?' dimmed':''}"
@@ -937,7 +1000,7 @@ function render(){
     ondragover="event.preventDefault();this.classList.add('over')"
     ondragleave="this.classList.remove('over')" ondrop="onDropRoot(event)">
     ↑ Drop here to make this person a root node (no parent)</div>`;
-  rootEl.innerHTML=warnHTML+dropZoneHTML+`<div class="org-wrap"><ul class="org-tree">${visibleRoots.map(r=>`<li>${renderTreeNode(r.id,visibleIds,matchIds)}</li>`).join('')}</ul></div>`;
+  rootEl.innerHTML=warnHTML+dropZoneHTML+`<div class="org-wrap"><ul class="org-tree">${visibleRoots.map(r=>liWrap(r.id,visibleIds,matchIds)).join('')}</ul></div>`;
 }
 function updateStatus(){
   document.getElementById('statUsers').textContent=perigeeUsers.length;
@@ -984,6 +1047,7 @@ function exportExcel(){
   if(!orgNodes.length){toast('Tree is empty — add people first','error');return;}
   const rows=[];
   orgNodes.forEach(node=>{
+    if(node.roleType==='TEAM_GROUP')return; // structural node — not a person
     const asm=getASMFor(node.id),rm=getRegMgrFor(node.id);
     const pu=findPerigeeUser(node.email);
     // Primary team row
@@ -1037,6 +1101,10 @@ function buildSummarySheet(){
   const rows=[['Level','Full Name','Email','Job Title','Role Type','Team(s)']];
   function walk(id,depth){
     const n=getNode(id);if(!n)return;
+    if(n.roleType==='TEAM_GROUP'){
+      rows.push([depth+1,'  '.repeat(depth)+'📁 '+(n.teamName||'Team Group'),'','','Team Group','']);
+      getChildren(id).forEach(c=>walk(c.id,depth+1));return;
+    }
     const teams=[n.teamName,...(n.extraTeams||[])].filter(Boolean).join(', ');
     const note=n.assistingNote?` [Assists: ${n.assistingNote}]`:'';
     rows.push([depth+1,'  '.repeat(depth)+((n.firstName+' '+n.lastName).trim()||n.email),n.email,n.jobTitle,getRoleInfo(n.roleType).label,teams+note]);
