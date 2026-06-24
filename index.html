@@ -178,6 +178,8 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#eef2f7;color:#1e293b;he
   <div class="hdr-actions">
     <button class="btn btn-ghost" onclick="loadPerigeeFile()">📂 Load Perigee Users</button>
     <button class="btn btn-ghost" onclick="addRootNode()">＋ Add Root Person</button>
+    <button class="btn btn-ghost btn-sm" onclick="importState()" title="Import a shared tree state file">📥 Import Tree</button>
+    <button class="btn btn-ghost btn-sm" onclick="exportState()" title="Export tree for sharing with others">📤 Export Tree</button>
     <button class="btn btn-warning btn-sm" onclick="clearAll()">🗑 Clear All</button>
     <button class="btn btn-ghost btn-sm" onclick="openAdmin()">🔒 Admin</button>
     <button class="btn btn-success" onclick="exportExcel()">⬇ Export Excel</button>
@@ -1155,6 +1157,42 @@ function switchAdminTab(tab){
         </div>`).join('')}`;
   }
 }
+function exportState(){
+  const state={version:'v1',exported:new Date().toISOString(),exportedBy:getDeviceId(),nodes:orgNodes};
+  const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download=`iram-org-state-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();URL.revokeObjectURL(url);
+  toast(`Exported ${orgNodes.length} nodes ✓`,'success');
+  logAudit('EXPORT',{id:'system',firstName:'State',lastName:'Export',email:'',teamName:'',roleType:'MEMBER'},'Full state export');
+}
+function importState(){
+  const inp=document.createElement('input');inp.type='file';inp.accept='.json';
+  inp.onchange=e=>{
+    const file=e.target.files[0];if(!file)return;
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      try{
+        const state=JSON.parse(ev.target.result);
+        if(!state.nodes||!Array.isArray(state.nodes))throw new Error('Invalid file — no nodes array found');
+        const when=state.exported?new Date(state.exported).toLocaleString():'unknown date';
+        if(!confirm(`Import ${state.nodes.length} nodes exported on ${when}?\n\nYour current tree will be REPLACED. (It will be backed up to trash first.)`))return;
+        // Back up current tree to trash before overwriting
+        const trash=getTrash();const batchId=uid();
+        orgNodes.forEach(n=>trash.push({...n,_deletedAt:new Date().toISOString(),_deletedBy:getDeviceId(),_batchId:batchId,_reason:'Pre-import backup'}));
+        saveTrash(trash);
+        orgNodes=state.nodes;
+        if(perigeeUsers.length)orgNodes.forEach(n=>{n.notInPerigee=!!n.email&&!findPerigeeUser(n.email);});
+        saveState();render();
+        toast(`Imported ${orgNodes.length} nodes ✓ — previous tree backed up to trash`,'success');
+      }catch(err){toast('Import failed: '+err.message,'error');}
+    };
+    reader.readAsText(file);
+  };
+  inp.click();
+}
+
 function clearAuditLog(){
   if(!confirm('Clear the entire audit log? This cannot be undone.'))return;
   saveAuditLog([]);switchAdminTab('log');toast('Audit log cleared','info');
