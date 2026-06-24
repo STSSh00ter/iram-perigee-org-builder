@@ -680,6 +680,16 @@ function buildFormHTML(node,pfx){
       <div class="prov-chip-group">${provChips}</div>
     </div>
     ${pfx.startsWith('ep_')?`
+      <div class="section-div">Reports To</div>
+      <div class="fg">
+        <label class="fl">Parent / Manager</label>
+        <select id="ep_parentId" class="fc" onchange="reparentNode(this.value)">
+          <option value="">(Root — no parent)</option>
+          ${orgNodes.filter(n=>n.id!==node.id&&!isDescendant(n.id,node.id))
+            .sort((a,b)=>(a.firstName+a.lastName).localeCompare(b.firstName+b.lastName))
+            .map(n=>`<option value="${n.id}"${n.id===node.parentId?' selected':''}>${(n.firstName+' '+n.lastName).trim()||n.email} (${getRoleInfo(n.roleType).badge})</option>`).join('')}
+        </select>
+      </div>
       <div class="section-div">Reporting Chain (auto)</div>
       <div id="ep_ancestorInfo"></div>`:''}`;
 }
@@ -972,6 +982,18 @@ function toast(msg,type='info'){
   el.className=`toast toast-${type}`;el.textContent=msg;c.appendChild(el);
   setTimeout(()=>{el.style.opacity='0';el.style.transition='opacity .4s';setTimeout(()=>el.remove(),400);},3500);
 }
+function reparentNode(newParentId){
+  if(!selectedNodeId)return;
+  const node=getNode(selectedNodeId);if(!node)return;
+  if(newParentId&&isDescendant(newParentId,selectedNodeId)){toast('Cannot set a descendant as parent','error');return;}
+  const oldParent=node.parentId?getNode(node.parentId):null;
+  node.parentId=newParentId||null;
+  logAudit('UPDATE',node,`Reparented from ${oldParent?(oldParent.firstName+' '+oldParent.lastName).trim():'root'} to ${newParentId?(()=>{const p=getNode(newParentId);return(p.firstName+' '+p.lastName).trim()||p.email;})():'root'}`);
+  saveState();render();
+  toast(`Moved under ${newParentId?(()=>{const p=getNode(newParentId);return(p.firstName+' '+p.lastName).trim()||p.email;})():'root (no parent)'} ✓`,'success');
+  selectNode(selectedNodeId);
+}
+
 function toggleEditPanel(){
   const panel=document.querySelector('.edit-panel');
   const btn=document.getElementById('epToggleBtn');
