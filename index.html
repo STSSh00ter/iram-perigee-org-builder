@@ -1,0 +1,1138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>iRam – Perigee Org Builder</title>
+<script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#eef2f7;color:#1e293b;height:100vh;overflow:hidden;display:flex;flex-direction:column}
+.hdr{background:#102742;color:#fff;padding:0 20px;height:52px;display:flex;align-items:center;gap:12px;flex-shrink:0;box-shadow:0 2px 10px rgba(0,0,0,.35)}
+.hdr-logo{font-size:20px;font-weight:900;letter-spacing:-.5px;color:#f97316}
+.hdr-title{font-size:15px;font-weight:700;flex:1}
+.hdr-sub{font-size:11px;opacity:.6;margin-top:1px}
+.hdr-actions{display:flex;gap:8px;align-items:center}
+.status-bar{background:#1e293b;color:#64748b;padding:3px 16px;font-size:11px;display:flex;gap:18px;flex-shrink:0}
+.status-bar b{color:#94a3b8}
+.btn{padding:7px 14px;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;transition:.15s;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.btn:hover{filter:brightness(1.12)}.btn:active{filter:brightness(.92)}
+.btn-primary{background:#2563eb;color:#fff}.btn-success{background:#059669;color:#fff}
+.btn-danger{background:#dc2626;color:#fff}.btn-warning{background:#d97706;color:#fff}
+.btn-ghost{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.2)}
+.btn-sm{padding:5px 10px;font-size:11px}
+.btn-copy{padding:3px 8px;font-size:10px;background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;border-radius:4px;cursor:pointer;font-weight:700}
+.btn-copy:hover{background:#e2e8f0}
+.btn-wa{padding:3px 10px;font-size:10px;background:#25d366;color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:700;text-decoration:none;display:inline-block}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.filter-bar{background:#fff;border-bottom:1px solid #e2e8f0;padding:8px 20px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex-shrink:0}
+.filter-label{font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em}
+.filter-pill{padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;border:1px solid #e2e8f0;cursor:pointer;background:#f8fafc;color:#475569;transition:.15s}
+.filter-pill:hover{background:#f0f4f8;border-color:#94a3b8}
+.filter-pill.active{background:#102742;color:#fff;border-color:#102742}
+.filter-pill.prov{border-color:#7c3aed;color:#7c3aed}.filter-pill.prov.active{background:#7c3aed;color:#fff}
+.filter-sep{color:#e2e8f0;font-size:16px;margin:0 2px}
+.filter-sel{padding:5px 8px;border:1px solid #e2e8f0;border-radius:6px;font-size:11px;font-weight:700;color:#475569;background:#f8fafc;cursor:pointer;outline:none}
+.filter-sel:focus{border-color:#2563eb}
+.filter-count{font-size:11px;color:#94a3b8;margin-left:auto}
+.filter-count b{color:#2563eb}
+.main{display:flex;flex:1;overflow:hidden}
+.tree-panel{flex:1;overflow:auto;padding:28px 32px;position:relative}
+.tree-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:14px;color:#94a3b8}
+.tree-empty-icon{font-size:56px;opacity:.4}
+.tree-empty h2{font-size:16px;font-weight:700;color:#64748b}
+.tree-empty p{font-size:13px;text-align:center;max-width:320px;line-height:1.5}
+.warn-banner{background:#fffbeb;border:1px solid #fbbf24;border-radius:8px;padding:10px 14px;margin-bottom:20px;display:flex;align-items:center;gap:10px;font-size:12px;color:#78350f}
+.warn-banner strong{display:block;margin-bottom:1px}
+.nip-alert{background:#fff7ed;border:1px solid #fb923c;border-radius:8px;padding:10px 12px;margin-top:6px;font-size:11px;color:#7c2d12}
+.nip-alert .nip-title{font-weight:800;font-size:12px;margin-bottom:6px;color:#9a3412}
+.nip-alert .nip-row{display:flex;align-items:center;gap:6px;margin-bottom:5px}
+.nip-alert .nip-label{font-weight:700;width:16px;text-align:center;flex-shrink:0}
+.nip-alert .nip-val{flex:1;font-size:10px;word-break:break-all}
+.nip-alert .nip-actions{display:flex;gap:5px;flex-wrap:wrap;margin-top:2px}
+/* Org tree CSS lines */
+.org-wrap{display:flex;flex-direction:column;align-items:center;min-width:max-content}
+.org-tree{padding:0;display:table}
+.org-tree li{float:left;text-align:center;list-style:none;position:relative;padding:20px 10px 0}
+.org-tree li::before,.org-tree li::after{content:'';position:absolute;top:0;right:50%;border-top:2px solid #475569;width:50%;height:20px}
+.org-tree li::after{right:auto;left:50%;border-left:2px solid #475569}
+.org-tree li:only-child::after,.org-tree li:only-child::before{display:none}
+.org-tree li:only-child{padding-top:0}
+.org-tree li:first-child::before,.org-tree li:last-child::after{border:0 none}
+.org-tree li:last-child::before{border-right:2px solid #475569;border-radius:0 5px 0 0}
+.org-tree li:first-child::after{border-radius:5px 0 0 0}
+.org-tree ul ul::before{content:'';position:absolute;top:0;left:50%;border-left:2px solid #475569;width:0;height:20px}
+.org-tree ul{padding-top:20px;position:relative;display:flex;transition:.3s}
+/* Node card */
+.node-card{display:inline-block;background:#fff;border-radius:10px;padding:11px 12px 11px 10px;width:186px;box-shadow:0 2px 10px rgba(0,0,0,.1);cursor:pointer;border:2px solid transparent;transition:.2s;position:relative;text-align:left;vertical-align:top}
+.node-card:hover{box-shadow:0 4px 18px rgba(0,0,0,.16);transform:translateY(-1px)}
+.node-card.selected{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.18)}
+.node-card.nip{border-color:#fb923c;background:#fffbf5}
+.node-card.nip.selected{border-color:#ea580c;box-shadow:0 0 0 3px rgba(251,146,60,.25)}
+.node-card[draggable="true"]{cursor:grab}
+.node-card.dragging{opacity:.35;border-style:dashed;cursor:grabbing}
+.node-card.drop-target{border-color:#059669 !important;box-shadow:0 0 0 4px rgba(5,150,105,.25) !important;transform:scale(1.03)}
+.node-card.dimmed{opacity:.4;pointer-events:none}
+.node-badge{position:absolute;top:-9px;left:50%;transform:translateX(-50%);padding:2px 9px;border-radius:20px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#fff;white-space:nowrap}
+.nip-pip{position:absolute;top:5px;right:6px;width:16px;height:16px;background:#fb923c;border-radius:50%;font-size:9px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;box-shadow:0 1px 4px rgba(251,146,60,.6)}
+.drag-handle{position:absolute;top:5px;left:5px;font-size:11px;color:#cbd5e1;line-height:1;cursor:grab;user-select:none}
+.node-name{font-weight:700;font-size:12px;margin-top:5px;color:#1e293b;padding-left:10px}
+.node-title{font-size:10px;color:#64748b;margin-top:2px;padding-left:10px}
+.node-email{font-size:9px;color:#94a3b8;margin-top:3px;word-break:break-all;padding-left:10px}
+.node-team{font-size:10px;color:#2563eb;margin-top:3px;font-style:italic;font-weight:600;padding-left:10px}
+.node-extra-teams{font-size:9px;color:#7c3aed;margin-top:2px;padding-left:10px;font-style:italic;font-weight:600}
+.node-assist{font-size:9px;color:#b45309;margin-top:2px;padding-left:10px;font-style:italic}
+.node-provs{font-size:9px;color:#059669;margin-top:2px;padding-left:10px;font-weight:700}
+.node-add-btn{position:absolute;bottom:-14px;left:50%;transform:translateX(-50%);width:28px;height:28px;border-radius:50%;background:#2563eb;color:#fff;border:2px solid #fff;cursor:pointer;font-size:18px;line-height:1;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(37,99,235,.5);z-index:10;transition:.2s}
+.node-add-btn:hover{background:#1d4ed8;transform:translateX(-50%) scale(1.12)}
+.drop-root-zone{border:2px dashed #94a3b8;border-radius:10px;padding:10px 16px;font-size:11px;color:#94a3b8;text-align:center;margin-bottom:16px;transition:.2s;display:none}
+.drop-root-zone.visible{display:block}.drop-root-zone.over{border-color:#059669;color:#059669;background:#f0fdf4}
+.role-reg{background:#7c3aed}.role-chan{background:#c2410c}.role-area{background:#b45309}.role-tl{background:#047857}.role-mem{background:#1d4ed8}
+/* Edit panel */
+.edit-panel{width:340px;background:#fff;border-left:1px solid #e2e8f0;display:flex;flex-direction:column;overflow:hidden;flex-shrink:0}
+.ep-header{padding:14px 16px;background:#102742;color:#fff;flex-shrink:0}
+.ep-header h3{font-size:14px;font-weight:700}
+.ep-header p{font-size:11px;opacity:.65;margin-top:2px}
+.ep-body{flex:1;overflow-y:auto;padding:14px}
+.ep-footer{padding:12px 16px;border-top:1px solid #f1f5f9;display:flex;gap:8px;flex-wrap:wrap;flex-shrink:0}
+.ep-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:#94a3b8;gap:10px;padding:20px;text-align:center}
+.ep-empty p{font-size:12px;line-height:1.5}
+/* Form */
+.fg{margin-bottom:12px;position:relative}
+.fl{display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#64748b;margin-bottom:4px}
+.fc{width:100%;padding:7px 9px;border:1px solid #e2e8f0;border-radius:6px;font-size:12px;outline:none;font-family:inherit;transition:.2s;background:#fff}
+.fc:focus{border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,.12)}
+.fc[readonly]{background:#f8fafc;color:#64748b}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.section-div{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;padding:6px 0 5px;border-bottom:1px solid #f1f5f9;margin:12px 0 12px}
+/* Province multi-select chips */
+.prov-chip-group{display:flex;flex-wrap:wrap;gap:4px;padding:2px 0}
+.prov-chip{display:inline-flex;align-items:center;cursor:pointer;user-select:none}
+.prov-chip input[type="checkbox"]{display:none}
+.prov-chip-lbl{padding:3px 9px;border-radius:12px;font-size:10px;font-weight:700;border:1px solid #e2e8f0;background:#f8fafc;color:#475569;cursor:pointer;transition:.12s;line-height:1.4}
+.prov-chip input:checked ~ .prov-chip-lbl{background:#7c3aed;color:#fff;border-color:#7c3aed}
+/* Extra teams multi-select */
+.extra-teams-select{width:100%;height:90px;border:1px solid #e2e8f0;border-radius:6px;font-size:11px;padding:4px;background:#fff;outline:none}
+.extra-teams-select:focus{border-color:#7c3aed;box-shadow:0 0 0 2px rgba(124,58,237,.12)}
+/* Conflict rule note */
+.conflict-note{background:#fef3c7;border:1px solid #f59e0b;border-radius:6px;padding:7px 10px;font-size:10px;color:#78350f;margin-bottom:8px}
+.conflict-note b{display:block;margin-bottom:2px}
+/* Admin panel */
+.admin-tabs{display:flex;border-bottom:1px solid #e2e8f0;margin:-18px -20px 14px;padding:0 20px}
+.admin-tab{padding:10px 16px;border:none;background:none;font-size:12px;font-weight:700;color:#64748b;cursor:pointer;border-bottom:3px solid transparent;transition:.15s}
+.admin-tab:hover{color:#1e293b}
+.admin-tab.active{color:#2563eb;border-bottom-color:#2563eb}
+.admin-content{max-height:58vh;overflow-y:auto}
+/* Delete confirmation */
+.del-info{background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px 14px;margin-bottom:12px}
+.del-info-title{font-weight:800;color:#991b1b;font-size:12px;margin-bottom:5px}
+.del-info-body{font-size:11px;color:#7f1d1d;line-height:1.55}
+/* Autocomplete */
+.ac-wrap{position:relative}
+.ac-list{position:fixed;background:#fff;border:1px solid #e2e8f0;border-radius:6px;max-height:200px;overflow-y:auto;z-index:3000;box-shadow:0 8px 28px rgba(0,0,0,.18);display:none}
+.ac-list.open{display:block}
+.ac-item{padding:7px 9px;cursor:pointer;border-bottom:1px solid #f8fafc;transition:.12s}
+.ac-item:hover{background:#f0f7ff}
+.ac-item .ac-email{font-size:11px;font-weight:700;color:#1e293b}
+.ac-item .ac-name{font-size:10px;color:#64748b}
+.ac-empty{padding:10px;font-size:11px;color:#94a3b8;text-align:center}
+/* Modal */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1000;display:none;align-items:center;justify-content:center}
+.overlay.open{display:flex}
+.modal{background:#fff;border-radius:12px;width:480px;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.modal-hdr{padding:15px 20px;background:#102742;color:#fff;flex-shrink:0}
+.modal-hdr h3{font-size:15px;font-weight:700}
+.modal-hdr p{font-size:11px;opacity:.65;margin-top:2px}
+.modal-body{padding:18px 20px;overflow-y:auto;flex:1}
+.modal-ftr{padding:12px 20px;border-top:1px solid #e2e8f0;display:flex;gap:8px;justify-content:flex-end;flex-shrink:0}
+/* Toast */
+.toast-container{position:fixed;bottom:20px;right:20px;z-index:9000;display:flex;flex-direction:column;gap:8px}
+.toast{padding:10px 16px;border-radius:8px;font-size:12px;font-weight:600;color:#fff;box-shadow:0 4px 16px rgba(0,0,0,.2);animation:slidein .25s ease;max-width:300px}
+.toast-success{background:#059669}.toast-error{background:#dc2626}.toast-info{background:#2563eb}.toast-warn{background:#d97706}
+@keyframes slidein{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+.badge{display:inline-block;padding:1px 7px;border-radius:12px;font-size:10px;font-weight:700;color:#fff}
+.badge-active{background:#059669}.badge-inactive{background:#94a3b8}
+::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:#f1f5f9}
+::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:3px}::-webkit-scrollbar-thumb:hover{background:#94a3b8}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <div class="hdr-logo">iRam</div>
+  <div><div class="hdr-title">Perigee Org Builder</div><div class="hdr-sub">Build your reporting tree &amp; export to Perigee</div></div>
+  <div class="hdr-actions">
+    <button class="btn btn-ghost" onclick="loadPerigeeFile()">📂 Load Perigee Users</button>
+    <button class="btn btn-ghost" onclick="addRootNode()">＋ Add Root Person</button>
+    <button class="btn btn-warning btn-sm" onclick="clearAll()">🗑 Clear All</button>
+    <button class="btn btn-ghost btn-sm" onclick="openAdmin()">🔒 Admin</button>
+    <button class="btn btn-success" onclick="exportExcel()">⬇ Export Excel</button>
+  </div>
+</div>
+<div class="status-bar">
+  <span>Perigee users: <b id="statUsers">0</b></span>
+  <span>Nodes: <b id="statNodes">0</b></span>
+  <span>Teams: <b id="statTeams">0</b></span>
+  <span>Pending Perigee: <b id="statNip" style="color:#94a3b8">0</b></span>
+</div>
+<div id="filterBar"></div>
+<div class="main">
+  <div class="tree-panel" id="treePanel">
+    <div class="tree-empty" id="treeEmpty">
+      <div class="tree-empty-icon">🌳</div>
+      <h2>No org tree yet</h2>
+      <p>Click <strong>↺ Reset to Org Template</strong> to load the pre-built structure, or <strong>+ Add Root Person</strong> to start fresh.</p>
+    </div>
+    <div id="treeRoot" style="display:none"></div>
+  </div>
+  <div class="edit-panel">
+    <div class="ep-header"><h3>👤 Edit Person</h3><p>Click any node in the tree to edit</p></div>
+    <div class="ep-body" id="epBody">
+      <div class="ep-empty"><div style="font-size:40px;opacity:.3">👈</div><p>Select a node in the tree to view and edit their details here</p></div>
+    </div>
+    <div class="ep-footer" id="epFooter" style="display:none">
+      <button class="btn btn-primary btn-sm" onclick="saveEdit()">💾 Save</button>
+      <button class="btn btn-sm" style="background:#f1f5f9;color:#64748b" onclick="addChildNode(selectedNodeId)">＋ Add Sub</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteNode(selectedNodeId)">🗑 Remove</button>
+    </div>
+  </div>
+</div>
+<div class="overlay" id="addModal">
+  <div class="modal">
+    <div class="modal-hdr"><h3 id="modalTitle">Add Person</h3><p id="modalSubtitle">New team member</p></div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-ftr">
+      <button class="btn btn-sm" style="background:#f1f5f9;color:#64748b" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmModal()">✓ Add Person</button>
+    </div>
+  </div>
+</div>
+<!-- Delete confirmation modal (2-step) -->
+<div class="overlay" id="delModal">
+  <div class="modal" style="width:440px">
+    <div class="modal-hdr"><h3 id="delModalTitle">Remove person?</h3><p>This is a soft delete — recoverable from Admin panel</p></div>
+    <div class="modal-body" id="delModalBody"></div>
+    <div class="modal-ftr" id="delStep1Ftr">
+      <button class="btn btn-sm" style="background:#f1f5f9;color:#64748b" onclick="closeDelModal()">Cancel</button>
+      <button class="btn btn-warning btn-sm" onclick="deleteStep2()">Proceed →</button>
+    </div>
+    <div class="modal-ftr" id="delStep2Ftr" style="display:none;flex-direction:column;gap:10px;align-items:stretch">
+      <div style="font-size:12px;color:#374151">Type <strong>DELETE</strong> to confirm:</div>
+      <input id="delConfirmInput" class="fc" placeholder="Type DELETE" oninput="onDelConfirmInput()" autocomplete="off" style="font-family:monospace;letter-spacing:.05em">
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn btn-sm" style="background:#f1f5f9;color:#64748b" onclick="deleteBack()">← Back</button>
+        <button id="delConfirmBtn" class="btn btn-danger btn-sm" disabled onclick="confirmDelete()">🗑 Confirm Delete</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Admin panel modal -->
+<div class="overlay" id="adminModal">
+  <div class="modal" style="width:760px;max-width:96vw">
+    <div class="modal-hdr" style="display:flex;justify-content:space-between;align-items:center">
+      <div><h3>🔒 Admin Panel</h3><p id="adminDeviceLabel">Device ID: loading…</p></div>
+      <button class="btn btn-ghost btn-sm" onclick="closeAdmin()">✕ Close</button>
+    </div>
+    <div class="modal-body" style="padding-top:0">
+      <div class="admin-tabs">
+        <button id="adminTabLog" class="admin-tab active" onclick="switchAdminTab('log')">📋 Audit Log</button>
+        <button id="adminTabTrash" class="admin-tab" onclick="switchAdminTab('trash')">🗑 Deleted Items</button>
+      </div>
+      <div class="admin-content" id="adminContent"></div>
+    </div>
+  </div>
+</div>
+<div class="toast-container" id="toasts"></div>
+
+<script>
+const NIP_EMAIL='laurette@outerjoin.co.za', NIP_WA='+27833532230', NIP_WA_DISPLAY='+27 83 353 2230';
+const ROLE_TYPES=[
+  {v:'REGIONAL_MANAGER',label:'Regional Manager',color:'role-reg',badge:'Reg. Manager'},
+  {v:'CHANNEL_HEAD',label:'Channel Head',color:'role-chan',badge:'Channel Head'},
+  {v:'AREA_MANAGER',label:'Area Manager',color:'role-area',badge:'Area Manager'},
+  {v:'TEAM_LEADER',label:'Team Leader',color:'role-tl',badge:'Team Leader'},
+  {v:'MEMBER',label:'Team Member',color:'role-mem',badge:'Member'},
+];
+const LEADER_ROLES=['REGIONAL_MANAGER','CHANNEL_HEAD','AREA_MANAGER','TEAM_LEADER'];
+const JOB_TITLES=['Brand Ambassador','General Merchandiser','Roaming Merchandiser','Field Agent','Representative','RVL Rep','Team Leader','Area Manager','Channel Manager','Key Account Manager','Operations Manager','Regional Manager','Channel Head','CRM Manager','Ops Lead','Learner','Promoter','Vacant'];
+const PROVINCES=['EC','FS','GP','KZN','LP','MP','NC','NW','WC'];
+const KNOWN_TEAMS=['BLUE POWER','Bosch Automotive','MM Chanel Head+Ops','Team Coastal','Team EC 1','Team EC 2','Team EC 3','Team Free State','Team GP MT','Team GP TT PTA','Team Highveld (MP)','Team Inland','Team KZN 1','Team KZN 2','Team KZN 3','Team KZN 4','Team Limpopo','Team Lowveld (MP)','Team Massbuild JHB','Team MT GP Centurion/Midrand','Team MT GP East/Central','Team MT GP North/West','Team MT GP NW (Potch)','Team MT GP PTA','Team MT GP South Vaal','Team Northen Cape','Team NW RustenB','Team Ops Heads','Team Ops Massbuild','Team RVL','Team WC 1','Team WC 2','Team WC 3','Team WC 4','Team WC 5','Team WC 6'];
+
+let perigeeUsers=[],orgNodes=[],selectedNodeId=null,pendingParentId=null,draggedNodeId=null,filterProvince='',filterTeamName='';
+
+function saveState(){try{localStorage.setItem('iram-org-v5',JSON.stringify(orgNodes));}catch(e){}}
+function loadState(){
+  try{
+    const d=localStorage.getItem('iram-org-v5');if(d)orgNodes=JSON.parse(d);
+    const p=localStorage.getItem('iram-perigee-v1');if(p)perigeeUsers=JSON.parse(p);
+  }catch(e){}
+}
+function savePerigee(){
+  try{localStorage.setItem('iram-perigee-v1',JSON.stringify(perigeeUsers));}catch(e){
+    try{const s=perigeeUsers.map(u=>({email:u.email,firstName:u.firstName,lastName:u.lastName,status:u.status}));
+    localStorage.setItem('iram-perigee-v1',JSON.stringify(s));}catch(e2){}
+  }
+}
+
+function uid(){return 'n'+Math.random().toString(36).substr(2,9);}
+function getNode(id){return orgNodes.find(n=>n.id===id);}
+function getChildren(id){return orgNodes.filter(n=>n.parentId===id);}
+function getRoots(){return orgNodes.filter(n=>!n.parentId);}
+function getRoleInfo(v){return ROLE_TYPES.find(r=>r.v===v)||ROLE_TYPES[4];}
+function findPerigeeUser(email){return perigeeUsers.find(u=>u.email===(email||'').trim().toLowerCase());}
+function isLeaderRole(role){return LEADER_ROLES.includes(role);}
+
+function getAncestorOfRole(nodeId,roleType){
+  let n=getNode(nodeId);
+  while(n&&n.parentId){n=getNode(n.parentId);if(n&&n.roleType===roleType)return n;}
+  return null;
+}
+function getTeamLeaderFor(id){const s=getNode(id);if(s&&s.roleType==='TEAM_LEADER')return s;return getAncestorOfRole(id,'TEAM_LEADER');}
+function getASMFor(id){return getAncestorOfRole(id,'AREA_MANAGER');}
+function getRegMgrFor(id){return getAncestorOfRole(id,'REGIONAL_MANAGER');}
+
+// Smart TL lookup: find ancestor who claims this specific team (via teamName or extraTeams)
+function getTeamLeaderForExport(nodeId, teamName){
+  let n=getNode(nodeId);
+  while(n){
+    if(n.teamName===teamName||(n.extraTeams||[]).includes(teamName)){
+      // This ancestor claims the team — return them if they're a leader role
+      if(isLeaderRole(n.roleType)) return n;
+    }
+    if(!n.parentId) break;
+    n=getNode(n.parentId);
+  }
+  return getTeamLeaderFor(nodeId);
+}
+
+function allDescendants(nodeId){const r=[],q=[nodeId];while(q.length){const id=q.shift();getChildren(id).forEach(c=>{r.push(c);q.push(c.id);});}return r;}
+function isDescendant(possibleDescId,ancestorId){return allDescendants(ancestorId).some(n=>n.id===possibleDescId);}
+function allTeamNames(){const s=new Set(KNOWN_TEAMS);orgNodes.forEach(n=>{if(n.teamName)s.add(n.teamName);(n.extraTeams||[]).forEach(t=>s.add(t));});return[...s].sort();}
+function nipCount(){return orgNodes.filter(n=>n.notInPerigee).length;}
+function fmtPerson(node){
+  if(!node)return '';
+  const name=(node.firstName+' '+node.lastName).trim();
+  if(name&&node.email)return `${name} (${node.email})`;
+  return node.email||name||'';
+}
+
+function getNodeProvinces(node){
+  if(node.assignedProvinces){const p=node.assignedProvinces.split(',').map(s=>s.trim()).filter(Boolean);if(p.length)return p;}
+  const t=(node.teamName||'').toLowerCase();
+  if(t.includes('kzn'))return['KZN'];
+  if(t.includes(' ec')||t.startsWith('ec ')||t.includes('east london'))return['EC'];
+  if(t.includes(' wc')||t.startsWith('wc ')||t.includes('western cape'))return['WC'];
+  if(t.includes(' gp')||t.startsWith('gp ')||t.includes('gauteng')||t.includes('jhb')||t.includes('pta')||t.includes('vaal')||t.includes('centurion')||t.includes('north/west')||t.includes('massbuild'))return['GP'];
+  if(t.includes('lowveld')||t.includes('highveld')||t.includes(' mp')||t.startsWith('mp '))return['MP'];
+  if(t.includes('limpopo')||t.includes(' lp')||t.startsWith('lp '))return['LP'];
+  if(t.includes('free state')||t.includes(' fs')||t.startsWith('fs '))return['FS'];
+  if(t.includes('northern cape')||t.includes(' nc')||t.startsWith('nc ')||t.includes('northen cape'))return['NC'];
+  if(t.includes('rustenb')||t.includes(' nw')||t.startsWith('nw ')||t.includes('potch'))return['NW'];
+  if(t.includes('inland'))return['FS','LP','MP','NC','NW'];
+  return[];
+}
+function availableProvinceFilters(){const s=new Set();orgNodes.forEach(n=>getNodeProvinces(n).forEach(p=>s.add(p)));return[...s].sort();}
+function isNationalNode(n){const np=getNodeProvinces(n);return np.length>=PROVINCES.length;}
+
+function loadPerigeeFile(){
+  const inp=document.createElement('input');inp.type='file';inp.accept='.xlsx,.xls';
+  inp.onchange=async(e)=>{
+    const file=e.target.files[0];if(!file)return;
+    try{
+      const buf=await file.arrayBuffer();const wb=XLSX.read(buf);
+      const sName=wb.SheetNames.find(n=>n.toLowerCase().includes('user'))||wb.SheetNames[0];
+      const rows=XLSX.utils.sheet_to_json(wb.Sheets[sName],{defval:''});
+      perigeeUsers=rows.map(r=>({
+        email:(r['Email']||r['email']||'').trim().toLowerCase(),
+        firstName:(r['First Name']||r['FirstName']||r['first_name']||'').trim(),
+        lastName:(r['Last Name']||r['LastName']||r['last_name']||'').trim(),
+        status:r['Status']||'',access:r['Access']||'',
+      })).filter(u=>u.email&&u.email.includes('@'));
+      savePerigee();
+      orgNodes.forEach(n=>{n.notInPerigee=!!n.email&&!findPerigeeUser(n.email);});
+      saveState();render();
+      toast(`Loaded & saved ${perigeeUsers.length} Perigee users ✓`,'success');
+    }catch(err){toast('Failed to read file: '+err.message,'error');}
+  };
+  inp.click();
+}
+
+function isProvMatch(n){
+  if(!filterProvince)return true;
+  if(isNationalNode(n))return false; // skip nodes covering all provinces — they'd match everything
+  return getNodeProvinces(n).includes(filterProvince);
+}
+function isTeamMatch(n){
+  if(!filterTeamName)return true;
+  return n.teamName===filterTeamName||(n.extraTeams||[]).includes(filterTeamName);
+}
+function computeVisibleIds(){
+  if(!filterProvince&&!filterTeamName)return null;
+  const directMatches=orgNodes.filter(n=>isProvMatch(n)&&isTeamMatch(n));
+  const visible=new Set();
+  directMatches.forEach(n=>{
+    visible.add(n.id);allDescendants(n.id).forEach(d=>visible.add(d.id));
+    let cur=getNode(n.parentId);while(cur){visible.add(cur.id);cur=getNode(cur.parentId);}
+  });
+  return visible;
+}
+function setFilter(prov,team){filterProvince=prov;filterTeamName=team;render();}
+function renderFilterBar(){
+  if(!orgNodes.length){document.getElementById('filterBar').innerHTML='';return;}
+  const provs=availableProvinceFilters();
+  const teams=allTeamNames().filter(t=>orgNodes.some(n=>n.teamName===t||(n.extraTeams||[]).includes(t)));
+  const active=filterProvince||filterTeamName;
+  const visIds=computeVisibleIds();
+  document.getElementById('filterBar').innerHTML=`
+    <div class="filter-bar">
+      <span class="filter-label">View:</span>
+      <button class="filter-pill ${!active?'active':''}" onclick="setFilter('','')">All (${orgNodes.length})</button>
+      ${provs.map(p=>`<button class="filter-pill prov ${filterProvince===p&&!filterTeamName?'active':''}" onclick="setFilter('${p}','')">${p}</button>`).join('')}
+      ${teams.length?`<span class="filter-sep">|</span>
+        <select class="filter-sel" onchange="setFilter('',this.value)">
+          <option value="">Team…</option>
+          ${teams.map(t=>`<option value="${t}" ${filterTeamName===t?'selected':''}>${t}</option>`).join('')}
+        </select>`:''}
+      ${active?`<span class="filter-count">Showing <b>${visIds?visIds.size:orgNodes.length}</b> of ${orgNodes.length} nodes</span>`:''}
+    </div>`;
+}
+
+function makeNode(parentId=null){
+  return{id:uid(),parentId,email:'',firstName:'',lastName:'',jobTitle:'',roleType:'MEMBER',
+    teamName:'',assignedProvinces:'',extraTeams:[],assistingNote:'',notInPerigee:false};
+}
+function addRootNode(){openModal(null);}
+function addChildNode(parentId){if(!parentId)return;openModal(parentId);}
+function insertNode(node){
+  orgNodes.push(node);logAudit('ADD',node);saveState();selectedNodeId=node.id;render();
+  toast((node.firstName||node.email||'Person')+' added'+(node.notInPerigee?' ⚠️ Not in Perigee':''),'success');
+}
+let pendingDeleteId=null;
+function deleteNode(id){
+  if(!id)return;const node=getNode(id);if(!node)return;
+  const desc=allDescendants(id);
+  pendingDeleteId=id;
+  const name=(node.firstName+' '+node.lastName).trim()||node.email||'(unnamed)';
+  document.getElementById('delModalTitle').textContent='Remove '+name+'?';
+  document.getElementById('delModalBody').innerHTML=`
+    <div class="del-info">
+      <div class="del-info-title">⚠️ Soft Delete — data is recoverable</div>
+      <div class="del-info-body">This person is <strong>not permanently deleted</strong>. They're moved to a recoverable archive. An admin can restore or permanently delete from the Admin panel.</div>
+    </div>
+    <div style="font-size:12px;line-height:1.9;color:#374151">
+      <b>Name:</b> ${name}<br>
+      <b>Email:</b> ${node.email||'—'}<br>
+      <b>Team:</b> ${node.teamName||'—'}<br>
+      <b>Role:</b> ${getRoleInfo(node.roleType).label}
+      ${desc.length>0?`<br><br><span style="color:#dc2626;font-weight:700">⚠ Also soft-deletes ${desc.length} subordinate${desc.length>1?'s':''}</span>`:''}
+    </div>`;
+  document.getElementById('delStep1Ftr').style.display='flex';
+  document.getElementById('delStep2Ftr').style.display='none';
+  document.getElementById('delModal').classList.add('open');
+}
+function deleteStep2(){
+  document.getElementById('delStep1Ftr').style.display='none';
+  document.getElementById('delStep2Ftr').style.display='flex';
+  document.getElementById('delConfirmInput').value='';
+  document.getElementById('delConfirmBtn').disabled=true;
+  setTimeout(()=>document.getElementById('delConfirmInput').focus(),50);
+}
+function deleteBack(){
+  document.getElementById('delStep1Ftr').style.display='flex';
+  document.getElementById('delStep2Ftr').style.display='none';
+}
+function onDelConfirmInput(){document.getElementById('delConfirmBtn').disabled=document.getElementById('delConfirmInput').value!=='DELETE';}
+function closeDelModal(){document.getElementById('delModal').classList.remove('open');pendingDeleteId=null;}
+function confirmDelete(){
+  if(!pendingDeleteId)return;
+  const node=getNode(pendingDeleteId);if(!node)return;
+  const desc=allDescendants(pendingDeleteId);
+  const toDelete=[node,...desc];
+  const trash=getTrash();const batchId=uid();
+  toDelete.forEach(n=>{trash.push({...n,_deletedAt:new Date().toISOString(),_deletedBy:getDeviceId(),_batchId:batchId});logAudit('DELETE',n);});
+  saveTrash(trash);
+  orgNodes=orgNodes.filter(n=>!toDelete.find(d=>d.id===n.id));
+  if(selectedNodeId&&toDelete.find(d=>d.id===selectedNodeId)){
+    selectedNodeId=null;
+    document.getElementById('epBody').innerHTML='<div class="ep-empty"><div style="font-size:40px;opacity:.3">👈</div><p>Select a node in the tree to view and edit their details here</p></div>';
+    document.getElementById('epFooter').style.display='none';
+  }
+  saveState();closeDelModal();render();
+  toast(`${toDelete.length} node${toDelete.length>1?'s':''} soft-deleted — recoverable from Admin panel`,'warn');
+  pendingDeleteId=null;
+}
+function clearAll(){
+  if(!confirm('Clear the entire org tree?\n\nThis moves ALL nodes to trash (recoverable from Admin panel).'))return;
+  const trash=getTrash();const batchId=uid();
+  orgNodes.forEach(n=>{trash.push({...n,_deletedAt:new Date().toISOString(),_deletedBy:getDeviceId(),_batchId:batchId});logAudit('DELETE',n,'Bulk clear');});
+  saveTrash(trash);
+  orgNodes=[];selectedNodeId=null;saveState();render();toast('Tree cleared — recoverable from Admin panel','warn');
+}
+
+function onDragStart(event,nodeId){
+  draggedNodeId=nodeId;event.dataTransfer.effectAllowed='move';event.dataTransfer.setData('text/plain',nodeId);
+  setTimeout(()=>{const el=document.querySelector(`[data-node="${nodeId}"]`);if(el)el.classList.add('dragging');},0);
+  const dz=document.getElementById('dropRootZone');if(dz)dz.classList.add('visible');
+}
+function onDragOver(event,targetId){
+  if(!draggedNodeId||draggedNodeId===targetId)return;
+  if(isDescendant(targetId,draggedNodeId))return;
+  event.preventDefault();event.dataTransfer.dropEffect='move';
+  document.querySelectorAll('.drop-target').forEach(el=>el.classList.remove('drop-target'));
+  const el=document.querySelector(`[data-node="${targetId}"]`);if(el)el.classList.add('drop-target');
+}
+function onDragLeave(event,targetId){const el=document.querySelector(`[data-node="${targetId}"]`);if(el)el.classList.remove('drop-target');}
+function onDrop(event,targetId){
+  event.preventDefault();
+  document.querySelectorAll('.drop-target').forEach(el=>el.classList.remove('drop-target'));
+  if(!draggedNodeId||draggedNodeId===targetId){draggedNodeId=null;return;}
+  if(isDescendant(targetId,draggedNodeId)){toast('Cannot drop onto own descendant','error');draggedNodeId=null;return;}
+  const node=getNode(draggedNodeId),target=getNode(targetId);
+  if(node&&target){node.parentId=targetId;saveState();render();toast(`Moved under ${target.firstName||target.email||'new parent'} ✓`,'success');}
+  draggedNodeId=null;
+}
+function onDropRoot(event){
+  event.preventDefault();
+  const dz=document.getElementById('dropRootZone');if(dz)dz.classList.remove('over','visible');
+  if(!draggedNodeId)return;
+  const node=getNode(draggedNodeId);
+  if(node){node.parentId=null;saveState();render();toast('Moved to root level ✓','success');}
+  draggedNodeId=null;
+}
+function onDragEnd(){
+  document.querySelectorAll('.dragging,.drop-target').forEach(el=>el.classList.remove('dragging','drop-target'));
+  const dz=document.getElementById('dropRootZone');if(dz)dz.classList.remove('visible','over');
+  draggedNodeId=null;
+}
+
+function openModal(parentId){
+  pendingParentId=parentId;const parent=parentId?getNode(parentId):null;
+  document.getElementById('modalTitle').textContent=parentId?'Add Subordinate':'Add Root Person';
+  document.getElementById('modalSubtitle').textContent=parent?`Reporting to: ${parent.firstName||parent.email||'(unnamed)'}`:'Top-level person (no parent)';
+  document.getElementById('modalBody').innerHTML=buildFormHTML(makeNode(parentId),'modal_');
+  wireAutoCompletes('modal_');
+  document.getElementById('addModal').classList.add('open');
+  document.getElementById('modal_email').focus();
+}
+function closeModal(){document.getElementById('addModal').classList.remove('open');pendingParentId=null;}
+function confirmModal(){
+  const node=makeNode(pendingParentId);
+  const email=(document.getElementById('modal_email').value||'').trim().toLowerCase();
+  if(!email){toast('Email is required','error');return;}
+  if(orgNodes.find(n=>n.email===email)){if(!confirm(`"${email}" is already in the tree. Add duplicate?`))return;}
+  collectFormInto(node,'modal_');closeModal();insertNode(node);
+}
+
+function selectNode(id){
+  selectedNodeId=id;render();const node=getNode(id);if(!node)return;
+  document.getElementById('epFooter').style.display='flex';
+  document.getElementById('epBody').innerHTML=buildFormHTML(node,'ep_');
+  wireAutoCompletes('ep_');refreshAncestorInfo();
+}
+function saveEdit(){
+  if(!selectedNodeId)return;const node=getNode(selectedNodeId);if(!node)return;
+  const email=(document.getElementById('ep_email').value||'').trim().toLowerCase();
+  if(!email){toast('Email is required','error');return;}
+  collectFormInto(node,'ep_');logAudit('UPDATE',node);saveState();render();toast('Saved ✓','success');
+  selectNode(selectedNodeId);
+}
+function refreshAncestorInfo(){
+  const el=document.getElementById('ep_ancestorInfo');if(!el)return;
+  const tl=getTeamLeaderFor(selectedNodeId);
+  const asm=getASMFor(selectedNodeId);const rm=getRegMgrFor(selectedNodeId);
+  el.innerHTML=`
+    <div class="fg"><label class="fl">Team Leader (auto)</label><input class="fc" readonly value="${fmtPerson(tl)||'—'}"></div>
+    <div class="fg"><label class="fl">ASM (auto)</label><input class="fc" readonly value="${fmtPerson(asm)||'—'}"></div>
+    <div class="fg"><label class="fl">Regional Manager (auto)</label><input class="fc" readonly value="${fmtPerson(rm)||'—'}"></div>`;
+}
+
+function collectFormInto(node,pfx){
+  node.email=(document.getElementById(pfx+'email').value||'').trim().toLowerCase();
+  node.firstName=(document.getElementById(pfx+'firstName').value||'').trim();
+  node.lastName=(document.getElementById(pfx+'lastName').value||'').trim();
+  node.jobTitle=document.getElementById(pfx+'jobTitle').value;
+  node.roleType=document.getElementById(pfx+'roleType').value;
+  node.teamName=(document.getElementById(pfx+'teamName').value||'').trim();
+  node.assignedProvinces=PROVINCES.filter(p=>{const cb=document.getElementById(pfx+'prov_'+p);return cb&&cb.checked;}).join(',');
+  // Extra teams only for leader roles; clear for MEMBER
+  if(isLeaderRole(node.roleType)){
+    const et=document.getElementById(pfx+'extraTeams');
+    node.extraTeams=et?Array.from(et.selectedOptions).map(o=>o.value):[];
+    node.assistingNote='';
+  } else {
+    node.extraTeams=[];
+    node.assistingNote=(document.getElementById(pfx+'assistingNote').value||'').trim();
+    if(node.extraTeams.length>0){
+      toast('Members can only belong to one team — extra team assignments cleared.','warn');
+      node.extraTeams=[];
+    }
+  }
+  node.notInPerigee=perigeeUsers.length>0&&!!node.email&&!findPerigeeUser(node.email);
+}
+
+function onRoleChange(pfx){
+  const role=document.getElementById(pfx+'roleType').value;
+  const isLeader=isLeaderRole(role);
+  const es=document.getElementById(pfx+'extraTeamsSection');
+  const ns=document.getElementById(pfx+'assistNoteSection');
+  if(es)es.style.display=isLeader?'':'none';
+  if(ns)ns.style.display=isLeader?'none':'';
+}
+
+function buildFormHTML(node,pfx){
+  const roleOpts=ROLE_TYPES.map(r=>`<option value="${r.v}"${node.roleType===r.v?' selected':''}>${r.label}</option>`).join('');
+  const jtOpts=JOB_TITLES.map(j=>`<option value="${j}"${node.jobTitle===j?' selected':''}>${j}</option>`).join('');
+  const pu=node.email?findPerigeeUser(node.email):null;
+  const nipShow=perigeeUsers.length>0&&node.email&&!pu;
+  const nodeProv=(node.assignedProvinces||'').split(',').map(s=>s.trim()).filter(Boolean);
+  const nodeExtra=node.extraTeams||[];
+  const teams=allTeamNames();
+  const isLeader=isLeaderRole(node.roleType);
+  const provChips=PROVINCES.map(p=>`
+    <label class="prov-chip">
+      <input type="checkbox" id="${pfx}prov_${p}" value="${p}" ${nodeProv.includes(p)?'checked':''}>
+      <span class="prov-chip-lbl">${p}</span>
+    </label>`).join('');
+  const extraOpts=teams.filter(t=>t!==node.teamName).map(t=>`<option value="${t}"${nodeExtra.includes(t)?' selected':''}>${t}</option>`).join('');
+  return`
+    <div class="section-div">Identity</div>
+    <div class="fg ac-wrap">
+      <label class="fl">Email *</label>
+      <input id="${pfx}email" class="fc" placeholder="Type email or search by name…" value="${node.email}"
+        autocomplete="off" oninput="onEmailInput('${pfx}')" onblur="onEmailBlur('${pfx}')">
+      <div id="${pfx}emailAcList" class="ac-list"></div>
+    </div>
+    <div id="${pfx}nipAlert" class="nip-alert" style="display:${nipShow?'block':'none'}">
+      <div class="nip-title">⚠️ Not in Perigee system</div>
+      <div style="margin-bottom:8px;font-size:10px;line-height:1.4">This person needs to be added by Outer Join before they can be included in a call cycle upload.</div>
+      <div class="nip-row"><span class="nip-label">📧</span><span class="nip-val">${NIP_EMAIL}</span></div>
+      <div class="nip-actions">
+        <button class="btn-copy" onclick="copyText('${NIP_EMAIL}')">Copy Email</button>
+        <a href="mailto:${NIP_EMAIL}" class="btn-wa" style="background:#2563eb">Open Email</a>
+      </div>
+      <div class="nip-row" style="margin-top:6px"><span class="nip-label">💬</span><span class="nip-val">${NIP_WA_DISPLAY}</span></div>
+      <div class="nip-actions">
+        <button class="btn-copy" onclick="copyText('${NIP_WA_DISPLAY}')">Copy Number</button>
+        <a href="https://wa.me/${NIP_WA}" target="_blank" class="btn-wa">Open WhatsApp</a>
+      </div>
+    </div>
+    <div class="fg"><label class="fl">Perigee Status</label>
+      <input id="${pfx}status" class="fc" readonly placeholder="— load Perigee file to validate —"
+        value="${pu?pu.status:(node.email&&perigeeUsers.length>0?'NOT IN PERIGEE':'')}">
+    </div>
+    <div class="form-row">
+      <div class="fg ac-wrap">
+        <label class="fl">First Name</label>
+        <input id="${pfx}firstName" class="fc" placeholder="First name" value="${node.firstName}"
+          autocomplete="off" oninput="onNameInput('${pfx}','fn')">
+        <div id="${pfx}fnAcList" class="ac-list"></div>
+      </div>
+      <div class="fg ac-wrap">
+        <label class="fl">Surname</label>
+        <input id="${pfx}lastName" class="fc" placeholder="Surname" value="${node.lastName}"
+          autocomplete="off" oninput="onNameInput('${pfx}','ln')">
+        <div id="${pfx}lnAcList" class="ac-list"></div>
+      </div>
+    </div>
+    <div class="section-div">Role &amp; Team</div>
+    <div class="fg"><label class="fl">Role Type *</label>
+      <select id="${pfx}roleType" class="fc" onchange="onRoleChange('${pfx}')">${roleOpts}</select>
+    </div>
+    <div class="fg"><label class="fl">Job Title</label>
+      <select id="${pfx}jobTitle" class="fc"><option value="">— Select —</option>${jtOpts}</select>
+    </div>
+    <div class="fg"><label class="fl">Primary Team</label>
+      <input id="${pfx}teamName" class="fc" placeholder="e.g. Team KZN 1" value="${node.teamName}" list="${pfx}teamList">
+      <datalist id="${pfx}teamList">${teams.map(t=>`<option value="${t}">`).join('')}</datalist>
+    </div>
+    <div id="${pfx}extraTeamsSection" style="display:${isLeader?'':'none'}">
+      <div class="fg">
+        <label class="fl">Also Team Leader For <span style="font-weight:400;text-transform:none">(Ctrl+click multi)</span></label>
+        <select id="${pfx}extraTeams" class="extra-teams-select" multiple>${extraOpts}</select>
+      </div>
+    </div>
+    <div id="${pfx}assistNoteSection" style="display:${isLeader?'none':''}">
+      <div class="conflict-note">
+        <b>Team Membership Rule</b>
+        A team member belongs to exactly one team. To note cross-team assistance, use the field below — it's informational only and doesn't generate extra export rows.
+      </div>
+      <div class="fg"><label class="fl">Assisting Note (other team branch)</label>
+        <input id="${pfx}assistingNote" class="fc" placeholder="e.g. Assisting Team KZN 2 during peak season" value="${node.assistingNote||''}">
+      </div>
+    </div>
+    <div class="fg">
+      <label class="fl">Assigned Province(s)</label>
+      <div class="prov-chip-group">${provChips}</div>
+    </div>
+    ${pfx.startsWith('ep_')?`
+      <div class="section-div">Reporting Chain (auto)</div>
+      <div id="ep_ancestorInfo"></div>`:''}`;
+}
+
+function wireAutoCompletes(pfx){
+  document.addEventListener('mousedown',function handler(e){
+    ['emailAcList','fnAcList','lnAcList'].forEach(id=>{
+      const el=document.getElementById(pfx+id);if(!el)return;
+      const inp=document.getElementById(pfx+(id==='emailAcList'?'email':id==='fnAcList'?'firstName':'lastName'));
+      if(el&&!el.contains(e.target)&&e.target!==inp)el.classList.remove('open');
+    });
+  });
+}
+function positionAcList(inputEl,listEl){
+  const r=inputEl.getBoundingClientRect();
+  listEl.style.top=(r.bottom+2)+'px';listEl.style.left=r.left+'px';listEl.style.width=r.width+'px';
+}
+function onEmailInput(pfx){
+  const emailEl=document.getElementById(pfx+'email');
+  const listEl=document.getElementById(pfx+'emailAcList');
+  const q=emailEl.value.trim().toLowerCase();
+  if(!q||q.length<2||!perigeeUsers.length){listEl.classList.remove('open');return;}
+  const matches=perigeeUsers.filter(u=>u.email.includes(q)||(u.firstName+' '+u.lastName).toLowerCase().includes(q)).slice(0,35);
+  renderAcList(listEl,matches,pfx,'email',emailEl);
+}
+function onEmailBlur(pfx){
+  setTimeout(()=>{
+    const email=(document.getElementById(pfx+'email').value||'').trim().toLowerCase();
+    const alertEl=document.getElementById(pfx+'nipAlert'),statusEl=document.getElementById(pfx+'status');
+    if(!alertEl||!email||!perigeeUsers.length){if(alertEl)alertEl.style.display='none';return;}
+    const pu=findPerigeeUser(email);
+    if(pu){alertEl.style.display='none';if(statusEl)statusEl.value=pu.status;}
+    else{alertEl.style.display='block';if(statusEl)statusEl.value='NOT IN PERIGEE';}
+  },200);
+}
+function onNameInput(pfx,which){
+  const fieldEl=document.getElementById(pfx+(which==='fn'?'firstName':'lastName'));
+  const listEl=document.getElementById(pfx+(which==='fn'?'fnAcList':'lnAcList'));
+  const q=(fieldEl.value||'').trim().toLowerCase();
+  if(!q||q.length<2){listEl.classList.remove('open');return;}
+  if(!perigeeUsers.length){
+    listEl.innerHTML='<div class="ac-empty">📂 Load Perigee Users first to get name suggestions</div>';
+    listEl.classList.add('open');positionAcList(fieldEl,listEl);return;
+  }
+  const matches=perigeeUsers.filter(u=>{
+    const fn=(u.firstName||'').toLowerCase(),ln=(u.lastName||'').toLowerCase();
+    return which==='fn'?(fn.startsWith(q)||fn.includes(q)):(ln.startsWith(q)||ln.includes(q));
+  }).slice(0,35);
+  renderAcList(listEl,matches,pfx,which,fieldEl);
+}
+function renderAcList(listEl,matches,pfx,source,inputEl){
+  if(!matches.length){
+    listEl.innerHTML='<div class="ac-empty">No match in Perigee list — you can still type manually</div>';
+    listEl.classList.add('open');positionAcList(inputEl,listEl);return;
+  }
+  listEl.innerHTML=matches.map(u=>`
+    <div class="ac-item" onmousedown="event.preventDefault();selectAcItem('${pfx}','${esc(u.email)}','${esc(u.firstName)}','${esc(u.lastName)}','${u.status}')">
+      <div class="ac-email">${u.email}</div>
+      <div class="ac-name">${u.firstName} ${u.lastName}
+        <span class="badge ${u.status==='ACTIVE'?'badge-active':'badge-inactive'}">${u.status}</span>
+      </div>
+    </div>`).join('');
+  listEl.classList.add('open');positionAcList(inputEl,listEl);
+}
+function esc(s){return(s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'")}
+function selectAcItem(pfx,email,fn,ln,status){
+  document.getElementById(pfx+'email').value=email;
+  document.getElementById(pfx+'firstName').value=fn;
+  document.getElementById(pfx+'lastName').value=ln;
+  document.getElementById(pfx+'status').value=status;
+  ['emailAcList','fnAcList','lnAcList'].forEach(id=>{const el=document.getElementById(pfx+id);if(el)el.classList.remove('open');});
+  const a=document.getElementById(pfx+'nipAlert');if(a)a.style.display='none';
+}
+function copyText(txt){
+  navigator.clipboard.writeText(txt).then(()=>toast('Copied ✓','info')).catch(()=>{
+    const el=document.createElement('textarea');el.value=txt;document.body.appendChild(el);
+    el.select();document.execCommand('copy');document.body.removeChild(el);toast('Copied ✓','info');
+  });
+}
+window.addEventListener('scroll',()=>document.querySelectorAll('.ac-list.open').forEach(el=>el.classList.remove('open')),true);
+window.addEventListener('resize',()=>document.querySelectorAll('.ac-list.open').forEach(el=>el.classList.remove('open')));
+
+function renderTreeNode(nodeId,visibleIds,matchIds){
+  const node=getNode(nodeId);if(!node)return'';
+  const ri=getRoleInfo(node.roleType);
+  const isSel=selectedNodeId===nodeId,isNip=node.notInPerigee;
+  const isDimmed=visibleIds&&matchIds&&!matchIds.has(nodeId);
+  const dispName=node.firstName?(node.firstName+(node.lastName?' '+node.lastName:'')):(node.email||'(unnamed)');
+  const provs=getNodeProvinces(node);const extras=node.extraTeams||[];
+  const allCh=getChildren(nodeId);
+  const visibleCh=visibleIds?allCh.filter(c=>visibleIds.has(c.id)):allCh;
+  const hiddenCount=allCh.length-visibleCh.length;
+  let childrenHTML='';
+  if(visibleCh.length)childrenHTML=`<ul>${visibleCh.map(c=>`<li>${renderTreeNode(c.id,visibleIds,matchIds)}</li>`).join('')}</ul>`;
+  return`<div>
+    <div class="node-card${isSel?' selected':''}${isNip?' nip':''}${isDimmed?' dimmed':''}"
+      data-node="${nodeId}" draggable="true"
+      ondragstart="onDragStart(event,'${nodeId}')" ondragover="onDragOver(event,'${nodeId}')"
+      ondragleave="onDragLeave(event,'${nodeId}')" ondrop="onDrop(event,'${nodeId}')"
+      ondragend="onDragEnd()" onclick="selectNode('${nodeId}')">
+      <div class="drag-handle" title="Drag to move">⠿</div>
+      <div class="node-badge ${ri.color}">${ri.badge}</div>
+      ${isNip?`<div class="nip-pip" title="Not in Perigee">!</div>`:''}
+      <div class="node-name">${dispName}</div>
+      <div class="node-title">${node.jobTitle||'<span style="color:#cbd5e1">No title</span>'}</div>
+      ${node.email?`<div class="node-email">${node.email}</div>`:''}
+      ${node.teamName?`<div class="node-team">${node.teamName}</div>`:''}
+      ${extras.length?`<div class="node-extra-teams">▲ Also: ${extras.join(' · ')}</div>`:''}
+      ${node.assistingNote?`<div class="node-assist">↗ ${node.assistingNote}</div>`:''}
+      ${provs.length?`<div class="node-provs">${provs.join(' · ')}</div>`:''}
+      ${hiddenCount>0?`<div style="font-size:9px;color:#94a3b8;margin-top:3px;padding-left:10px">+${hiddenCount} hidden by filter</div>`:''}
+    </div>
+    <button class="node-add-btn" onclick="event.stopPropagation();addChildNode('${nodeId}')" title="Add subordinate">+</button>
+    ${childrenHTML}
+  </div>`;
+}
+
+function render(){
+  updateStatus();renderFilterBar();
+  const roots=getRoots();
+  const emptyEl=document.getElementById('treeEmpty'),rootEl=document.getElementById('treeRoot');
+  if(!roots.length){emptyEl.style.display='';rootEl.style.display='none';return;}
+  emptyEl.style.display='none';rootEl.style.display='';
+  const visibleIds=computeVisibleIds();
+  let matchIds=null;
+  if(visibleIds&&(filterProvince||filterTeamName)){
+    matchIds=new Set(orgNodes.filter(n=>isProvMatch(n)&&isTeamMatch(n))
+      .flatMap(n=>[n.id,...allDescendants(n.id).map(d=>d.id)]));
+  }
+  const visibleRoots=visibleIds?roots.filter(r=>visibleIds.has(r.id)):roots;
+  const warnHTML=perigeeUsers.length===0?`
+    <div class="warn-banner"><span style="font-size:18px">⚠️</span>
+      <div><strong>No Perigee users loaded</strong>Emails won't be validated. Click <em>Load Perigee Users</em> to load the 1793-perigee.xlsx file.</div>
+    </div>`:'';
+  const dropZoneHTML=`<div id="dropRootZone" class="drop-root-zone"
+    ondragover="event.preventDefault();this.classList.add('over')"
+    ondragleave="this.classList.remove('over')" ondrop="onDropRoot(event)">
+    ↑ Drop here to make this person a root node (no parent)</div>`;
+  rootEl.innerHTML=warnHTML+dropZoneHTML+`<div class="org-wrap"><ul class="org-tree">${visibleRoots.map(r=>`<li>${renderTreeNode(r.id,visibleIds,matchIds)}</li>`).join('')}</ul></div>`;
+}
+function updateStatus(){
+  document.getElementById('statUsers').textContent=perigeeUsers.length;
+  document.getElementById('statNodes').textContent=orgNodes.length;
+  const tSet=new Set(orgNodes.flatMap(n=>[n.teamName,...(n.extraTeams||[])]).filter(Boolean));
+  document.getElementById('statTeams').textContent=tSet.size;
+  const nip=nipCount();const nipEl=document.getElementById('statNip');
+  nipEl.textContent=nip;nipEl.style.color=nip>0?'#fbbf24':'#94a3b8';
+}
+
+function exportExcel(){
+  if(!orgNodes.length){toast('Tree is empty — add people first','error');return;}
+  const rows=[];
+  orgNodes.forEach(node=>{
+    const asm=getASMFor(node.id),rm=getRegMgrFor(node.id);
+    const pu=findPerigeeUser(node.email);
+    // Primary team row
+    const tl=getTeamLeaderForExport(node.id,node.teamName);
+    const baseRow={
+      'USER ID':'','USER EMAIL':node.email,
+      'FIRST NAME':node.firstName,'SURNAME':node.lastName,
+      'STATUS':pu?pu.status:(node.notInPerigee?'NOT IN PERIGEE':'ACTIVE'),
+      'ASSIGNED PROVINCES':node.assignedProvinces,
+      'JOB TITLE':node.jobTitle,'LEAVE TYPE':'','LEAVE START':'','LEAVE END':'',
+      'TEAM NAME':node.teamName,
+      'TEAM LEADER':node.roleType==='TEAM_LEADER'?fmtPerson(node):fmtPerson(tl),
+      'ASM':node.roleType==='AREA_MANAGER'?fmtPerson(node):fmtPerson(asm),
+      'REGIONAL MANAGER':node.roleType==='REGIONAL_MANAGER'?fmtPerson(node):fmtPerson(rm),
+      'ACTION':node.notInPerigee?'PENDING_PERIGEE_ACTIVATION':'ADD',
+      'CYCLE STATUS':'ACTIVE','CYCLE':4,'CYCLE START DATE':'','CYCLE END DATE':'',
+    };
+    rows.push(baseRow);
+    // Extra team rows (leader roles only — members can't have extraTeams)
+    (node.extraTeams||[]).forEach(extraTeam=>{
+      const etl=getTeamLeaderForExport(node.id,extraTeam);
+      rows.push({...baseRow,'TEAM NAME':extraTeam,
+        'TEAM LEADER':node.roleType==='TEAM_LEADER'?fmtPerson(node):fmtPerson(etl)});
+    });
+  });
+  const wb=XLSX.utils.book_new();
+  const cw=[{wch:10},{wch:34},{wch:16},{wch:16},{wch:18},{wch:14},{wch:22},{wch:12},{wch:14},{wch:12},{wch:28},{wch:38},{wch:38},{wch:38},{wch:28},{wch:14},{wch:8},{wch:16},{wch:14}];
+  const perigeeRows=rows.filter(r=>r.STATUS!=='NOT IN PERIGEE');
+  const nipRows=rows.filter(r=>r.STATUS==='NOT IN PERIGEE');
+  const ws1=XLSX.utils.json_to_sheet(perigeeRows.length?perigeeRows:rows);
+  ws1['!cols']=cw;XLSX.utils.book_append_sheet(wb,ws1,'Teams And User Cycle');
+  if(nipRows.length){
+    const ws2=XLSX.utils.aoa_to_sheet([
+      ['NOTE: These people are NOT yet in the Perigee system. Contact Outer Join to have them added.'],
+      ['Email: '+NIP_EMAIL+'   WhatsApp: '+NIP_WA_DISPLAY],[''],
+      ...XLSX.utils.sheet_to_json(XLSX.utils.json_to_sheet(nipRows),{header:1}),
+    ]);
+    XLSX.utils.book_append_sheet(wb,ws2,'Pending Perigee Activation');
+  }
+  const ws3=XLSX.utils.aoa_to_sheet(buildSummarySheet());
+  ws3['!cols']=[{wch:6},{wch:30},{wch:34},{wch:22},{wch:16},{wch:30}];
+  XLSX.utils.book_append_sheet(wb,ws3,'Org Summary');
+  const date=new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb,`iRam-Perigee-OrgExport-${date}.xlsx`);
+  toast(`Exported ${rows.length} rows (${nipRows.length} pending activation) ✓`,'success');
+}
+function buildSummarySheet(){
+  const rows=[['Level','Full Name','Email','Job Title','Role Type','Team(s)']];
+  function walk(id,depth){
+    const n=getNode(id);if(!n)return;
+    const teams=[n.teamName,...(n.extraTeams||[])].filter(Boolean).join(', ');
+    const note=n.assistingNote?` [Assists: ${n.assistingNote}]`:'';
+    rows.push([depth+1,'  '.repeat(depth)+((n.firstName+' '+n.lastName).trim()||n.email),n.email,n.jobTitle,getRoleInfo(n.roleType).label,teams+note]);
+    getChildren(id).forEach(c=>walk(c.id,depth+1));
+  }
+  getRoots().forEach(r=>walk(r.id,0));return rows;
+}
+function toast(msg,type='info'){
+  const c=document.getElementById('toasts');const el=document.createElement('div');
+  el.className=`toast toast-${type}`;el.textContent=msg;c.appendChild(el);
+  setTimeout(()=>{el.style.opacity='0';el.style.transition='opacity .4s';setTimeout(()=>el.remove(),400);},3500);
+}
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){closeModal();closeDelModal();closeAdmin();}
+  if(e.key==='Delete'&&selectedNodeId&&document.activeElement.tagName==='BODY')deleteNode(selectedNodeId);
+});
+
+// ─── DEVICE ID ──────────────────────────────────────────────────────────────
+function getDeviceId(){
+  let id=localStorage.getItem('iram-device-id');
+  if(!id){id='DEV-'+Date.now().toString(36).toUpperCase()+'-'+Math.random().toString(36).substr(2,5).toUpperCase();localStorage.setItem('iram-device-id',id);}
+  return id;
+}
+
+// ─── AUDIT LOG ──────────────────────────────────────────────────────────────
+function getAuditLog(){try{return JSON.parse(localStorage.getItem('iram-audit-v1')||'[]');}catch(e){return[];}}
+function saveAuditLog(log){try{localStorage.setItem('iram-audit-v1',JSON.stringify(log.slice(-1000)));}catch(e){}}
+function logAudit(action,node,detail=''){
+  const log=getAuditLog();
+  log.push({id:uid(),action,nodeId:node.id,name:(node.firstName+' '+node.lastName).trim()||node.email,email:node.email,team:node.teamName,role:node.roleType,timestamp:new Date().toISOString(),deviceId:getDeviceId(),detail});
+  saveAuditLog(log);
+}
+
+// ─── TRASH (SOFT DELETE) ─────────────────────────────────────────────────────
+function getTrash(){try{return JSON.parse(localStorage.getItem('iram-trash-v1')||'[]');}catch(e){return[];}}
+function saveTrash(t){try{localStorage.setItem('iram-trash-v1',JSON.stringify(t));}catch(e){}}
+
+// ─── ADMIN PANEL ─────────────────────────────────────────────────────────────
+const ADMIN_PASS='iRam@admin2026';
+let adminAuthed=false,adminTab='log';
+function openAdmin(){
+  if(!adminAuthed){
+    const pw=prompt('Admin password:');
+    if(pw===null)return;
+    if(pw!==ADMIN_PASS){toast('Incorrect password','error');return;}
+    adminAuthed=true;
+  }
+  document.getElementById('adminDeviceLabel').textContent='Device ID: '+getDeviceId();
+  switchAdminTab('log');
+  document.getElementById('adminModal').classList.add('open');
+}
+function closeAdmin(){document.getElementById('adminModal').classList.remove('open');}
+function switchAdminTab(tab){
+  adminTab=tab;
+  document.getElementById('adminTabLog').className='admin-tab'+(tab==='log'?' active':'');
+  document.getElementById('adminTabTrash').className='admin-tab'+(tab==='trash'?' active':'');
+  const log=getAuditLog(),trash=getTrash();
+  if(tab==='log'){
+    const rows=log.slice().reverse().slice(0,300);
+    const actionColor={ADD:'#059669',UPDATE:'#2563eb',DELETE:'#dc2626',RESTORE:'#7c3aed',HARD_DELETE:'#991b1b'};
+    document.getElementById('adminContent').innerHTML=`
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <span style="font-size:11px;color:#64748b">${log.length} total entries</span>
+        <button class="btn btn-sm" style="background:#f1f5f9;color:#64748b;font-size:11px" onclick="clearAuditLog()">🗑 Clear Log</button>
+      </div>
+      <table style="width:100%;font-size:11px;border-collapse:collapse">
+        <thead><tr style="background:#f8fafc;position:sticky;top:0">
+          <th style="padding:6px 8px;text-align:left;border-bottom:2px solid #e2e8f0">Action</th>
+          <th style="padding:6px 8px;text-align:left;border-bottom:2px solid #e2e8f0">Person</th>
+          <th style="padding:6px 8px;text-align:left;border-bottom:2px solid #e2e8f0">Team</th>
+          <th style="padding:6px 8px;text-align:left;border-bottom:2px solid #e2e8f0">When</th>
+          <th style="padding:6px 8px;text-align:left;border-bottom:2px solid #e2e8f0">Device</th>
+        </tr></thead>
+        <tbody>${rows.map(e=>`<tr style="border-bottom:1px solid #f8fafc">
+          <td style="padding:5px 8px"><span style="display:inline-block;padding:1px 7px;border-radius:12px;font-size:9px;font-weight:800;color:#fff;background:${actionColor[e.action]||'#94a3b8'}">${e.action}</span></td>
+          <td style="padding:5px 8px;font-weight:600;color:#1e293b">${e.name||e.email||'—'}</td>
+          <td style="padding:5px 8px;color:#64748b">${e.team||'—'}</td>
+          <td style="padding:5px 8px;color:#94a3b8;white-space:nowrap">${new Date(e.timestamp).toLocaleString()}</td>
+          <td style="padding:5px 8px;color:#94a3b8;font-size:10px">${(e.deviceId||'').slice(0,20)}</td>
+        </tr>`).join('')}
+        ${rows.length===0?'<tr><td colspan="5" style="padding:30px;text-align:center;color:#94a3b8">No audit entries yet</td></tr>':''}
+        </tbody></table>`;
+  } else {
+    document.getElementById('adminContent').innerHTML=`
+      <div style="font-size:11px;color:#64748b;margin-bottom:10px">${trash.length} item(s) in trash</div>
+      ${trash.length===0?'<div style="text-align:center;padding:40px;color:#94a3b8;font-size:13px">🗑 Trash is empty</div>':
+      trash.slice().reverse().map(n=>`
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:700;font-size:12px;color:#1e293b">${(n.firstName+' '+n.lastName).trim()||n.email||'(unnamed)'}</div>
+            <div style="font-size:10px;color:#64748b;margin-top:2px">${n.email||'—'} · ${n.teamName||'—'} · ${getRoleInfo(n.roleType).label}</div>
+            <div style="font-size:10px;color:#94a3b8;margin-top:1px">Deleted: ${new Date(n._deletedAt).toLocaleString()} · By: ${(n._deletedBy||'').slice(0,20)}</div>
+          </div>
+          <div style="display:flex;gap:5px;flex-shrink:0">
+            <button class="btn btn-sm" style="background:#059669;color:#fff;font-size:10px" onclick="restoreFromTrash('${n.id}')">↩ Restore</button>
+            <button class="btn btn-danger btn-sm" style="font-size:10px" onclick="hardDelete('${n.id}')">✕ Perm. Delete</button>
+          </div>
+        </div>`).join('')}`;
+  }
+}
+function clearAuditLog(){
+  if(!confirm('Clear the entire audit log? This cannot be undone.'))return;
+  saveAuditLog([]);switchAdminTab('log');toast('Audit log cleared','info');
+}
+function restoreFromTrash(nodeId){
+  const trash=getTrash();const item=trash.find(n=>n.id===nodeId);if(!item)return;
+  const restored={...item};delete restored._deletedAt;delete restored._deletedBy;delete restored._batchId;
+  if(restored.parentId&&!getNode(restored.parentId)){
+    if(!confirm(`Parent node no longer exists. Restore as a root node?`))return;
+    restored.parentId=null;
+  }
+  orgNodes.push(restored);saveTrash(trash.filter(n=>n.id!==nodeId));saveState();render();
+  logAudit('RESTORE',restored);switchAdminTab('trash');
+  toast(`${(restored.firstName+' '+restored.lastName).trim()||restored.email} restored ✓`,'success');
+}
+function hardDelete(nodeId){
+  if(!confirm('Permanently delete this record?\n\nThis CANNOT be undone.'))return;
+  const trash=getTrash();const item=trash.find(n=>n.id===nodeId);
+  if(item)logAudit('HARD_DELETE',item,'Admin permanent deletion');
+  saveTrash(trash.filter(n=>n.id!==nodeId));switchAdminTab('trash');toast('Permanently deleted','warn');
+}
+
+// ============================================================
+// INITIAL ORG DATA – June 2026 Organogram
+// ============================================================
+function getInitialOrg(){
+  const mk=(id,pid,fn,ln,email,job,role,team,provs,extra,assist)=>({
+    id,parentId:pid||null,firstName:fn||'',lastName:ln||'',
+    email:(email||'').toLowerCase(),jobTitle:job||'',roleType:role||'MEMBER',
+    teamName:team||'',assignedProvinces:provs||'',
+    extraTeams:extra||[],assistingNote:assist||'',notInPerigee:false,
+  });
+  return[
+  // ─── MANAGEMENT LAYER ───────────────────────────────────────────────────────
+  mk('g01',null,'Grant','Berridge','grant@iram.co.za','Operations Manager','REGIONAL_MANAGER','Team Ops Heads','EC,FS,GP,KZN,LP,MP,NC,NW,WC'),
+  // Channel Head – Massmart/Modern Trade ops
+  mk('g02','g01','Joshua','Cuthbertson','','Channel Manager','CHANNEL_HEAD','MM Chanel Head+Ops','GP'),
+  // Regional – Coastal
+  mk('g03','g01','Ashley','Maharaj','','Regional Manager','REGIONAL_MANAGER','Team Coastal','EC,KZN,WC'),
+  // Area – GP Modern Trade
+  mk('g04','g01','Liza','Albers','','Area Manager','AREA_MANAGER','Team GP MT','GP'),
+  // Area – Inland
+  mk('g05','g01','Lucky','Nkosi','','Area Manager','AREA_MANAGER','Team Inland','FS,LP,MP,NC,NW'),
+  // RVL
+  mk('g06','g01','Johann','Botha','','RVL Manager','AREA_MANAGER','Team RVL','EC,GP,KZN,WC'),
+  // Bosch
+  mk('g07','g01','','','','','AREA_MANAGER','BLUE POWER','GP'),
+  mk('g08','g01','','','','','AREA_MANAGER','Bosch Automotive','GP,KZN'),
+  // Under Joshua
+  mk('g09','g02','Petro','Thema','','Area Manager','AREA_MANAGER','Team GP TT PTA','GP'),
+  mk('g10','g02','Dean','Smith','','Area Manager','AREA_MANAGER','Team Massbuild JHB','GP'),
+  mk('g11','g02','Len','Klynsmith','','Operations Manager','AREA_MANAGER','Team Ops Massbuild','GP'),
+  // Under Ashley – KZN (Sibusiso Makhathini = KZN area mgr, also covers Team EC 1)
+  mk('g12','g03','Sibusiso','Makhathini','','Area Manager','AREA_MANAGER','Team KZN 4','EC,KZN',['Team EC 1']),
+  mk('g13','g12','Sumith','Sahadeo','','Team Leader','TEAM_LEADER','Team KZN 1','KZN'),
+  mk('g14','g12','Sibusiso','Maluleka','','Team Leader','TEAM_LEADER','Team KZN 2','KZN'),
+  mk('g15','g12','Andile','Zungu','','Team Leader','TEAM_LEADER','Team KZN 3','KZN'),
+  mk('g16','g12','Nkululeko','Mfoza','','Team Leader','TEAM_LEADER','Team KZN 4','KZN'),
+  // Under Ashley – WC+EC (Logan leads WC 1,2,3 & EC 2,3 as area mgr + TL)
+  mk('g17','g03','Logan','Jacobs','','Area Manager','AREA_MANAGER','Team WC 1','EC,WC',['Team WC 2','Team WC 3','Team EC 2','Team EC 3']),
+  // Under Ashley – WC 4+5 (Tikhumbire)
+  mk('g18','g03','Tikhumbire','Chipumphula','','Area Manager','AREA_MANAGER','Team WC 4','WC',['Team WC 5']),
+  mk('g19','g18','Nonkosi','Sonakile','nonkosi@iram.co.za','Team Leader','TEAM_LEADER','Team WC 6','WC'),
+  // Under Liza – GP Modern Trade team leaders
+  mk('g20','g04','Nozipho','Mzoneli','','Team Leader','TEAM_LEADER','Team MT GP South Vaal','GP'),
+  mk('g21','g04','Brighton','Mafu','','Team Leader','TEAM_LEADER','Team MT GP North/West','GP',['Team MT GP NW (Potch)']),
+  mk('g22','g04','Beauty','Bepe','','Team Leader','TEAM_LEADER','Team MT GP East/Central','GP'),
+  mk('g23','g04','Gugu','Ntame','','Team Leader','TEAM_LEADER','Team MT GP Centurion/Midrand','GP',['Team MT GP PTA']),
+  // Under Lucky – Inland team leaders
+  mk('g24','g05','Nonhlanhla','Ngobeni','','Team Leader','TEAM_LEADER','Team Lowveld (MP)','MP'),
+  mk('g25','g05','Leonard','Thamaga','','Team Leader','TEAM_LEADER','Team Highveld (MP)','LP,MP',['Team Limpopo']),
+  mk('g26','g05','Petro','Themba','','Team Leader','TEAM_LEADER','Team NW RustenB','NW'),
+  mk('g27','g05','Thabo','Banda','','Team Leader','TEAM_LEADER','Team Northen Cape','NC'),
+  mk('g28','g05','Mpolokeng','Lekgari','','Team Leader','TEAM_LEADER','Team Free State','FS'),
+
+  // ─── KZN TEAM MEMBERS ────────────────────────────────────────────────────────
+  // Team KZN 1 – Sumith Sahadeo (South KZN)
+  mk('m01','g13','Mpilonhle','Shezi','Mpilonhle@Iram.co.za','Brand Ambassador','MEMBER','Team KZN 1','KZN'),
+  mk('m02','g13','Kwanele','Mdunge','kwanele.Mdunge@iram.co.za','Brand Ambassador','MEMBER','Team KZN 1','KZN'),
+  // Team KZN 2 – Sibusiso Maluleka (PMB)
+  mk('m03','g14','Makhosi','Shembe','Makhosi@iram.co.za','General Merchandiser','MEMBER','Team KZN 2','KZN'),
+  mk('m04','g14','Thembelihle','Sibanyoni','ThembelihleSibanyoni@Iram.co.za','General Merchandiser','MEMBER','Team KZN 2','KZN'),
+  mk('m05','g14','Khulekani','Tsese','tsesekhulekani@gmail.com','Brand Ambassador','MEMBER','Team KZN 2','KZN'),
+  // Team KZN 3 – Andile Zungu (North)
+  mk('m06','g15','Njabulo','Mhlongo','Njabulo.Mhlongo@Iram.co.za','Brand Ambassador','MEMBER','Team KZN 3','KZN'),
+  mk('m07','g15','Fundile','Ndaba','fundilendaba@iram.co.za','General Merchandiser','MEMBER','Team KZN 3','KZN'),
+  mk('m08','g15','Sthembiso','Dladla','dsthembiso93@gmail.com','Brand Ambassador','MEMBER','Team KZN 3','KZN'),
+  // Team KZN 4 – Nkululeko Mfoza (Central/Outlying)
+  mk('m09','g16','Zolile','Zwane','Zolile@Iram.co.za','Brand Ambassador','MEMBER','Team KZN 4','KZN'),
+  mk('m10','g16','Sokela','Saneliso','aneled253@gmail.com','Brand Ambassador','MEMBER','Team KZN 4','KZN'),
+  mk('m11','g16','Siphindile','Xulu','Siphindil@Iram.co.za','General Merchandiser','MEMBER','Team KZN 4','KZN'),
+
+  // ─── EC TEAM MEMBERS (under Sibusiso Makhathini g12 as TL for EC 1) ─────────
+  mk('m12','g12','Phindiwe','Quluba','phindiweq@iram.co.za','General Merchandiser','MEMBER','Team EC 1','EC'),
+  mk('m13','g12','Msimelelo','Ntikinca','MsimeleloN@Iram.co.za','Brand Ambassador','MEMBER','Team EC 1','EC'),
+  mk('m14','g12','Charne','Soetland','charnesoetland@gmail.com','General Merchandiser','MEMBER','Team EC 1','EC'),
+  mk('m15','g12','Chumaninande','Bless','papuchumani@gmail.com','Brand Ambassador','MEMBER','Team EC 1','EC'),
+  mk('m16','g12','Denrick','Terblanche','terblanchedenrick08@gmail.com','Roaming Merchandiser','MEMBER','Team EC 1','EC'),
+
+  // ─── WC MEMBERS (under Logan Jacobs g17) ─────────────────────────────────────
+  mk('m17','g17','Tara','Luyt','TaraL@Iram.co.za','General Merchandiser','MEMBER','Team WC 1','WC'),
+  mk('m18','g17','Ziyanda','Rasmeni','ziyanda@iram.co.za','General Merchandiser','MEMBER','Team WC 2','WC'),
+  mk('m19','g17','Thokozani','Dyantyi','thokozanidyantyi@iram.co.za','General Merchandiser','MEMBER','Team WC 2','WC'),
+  mk('m20','g17','Phumlani','Sako','Phumlani@Iram.co.za','Brand Ambassador','MEMBER','Team WC 3','WC'),
+  mk('m21','g17','Chad','Koopman','ChadKoopman@Iram.co.za','Brand Ambassador','MEMBER','Team WC 3','WC'),
+  mk('m22','g17','Angelo','Patel','angelopatel03@gmail.com','Brand Ambassador','MEMBER','Team WC 3','WC'),
+
+  // ─── GP MODERN TRADE MEMBERS ─────────────────────────────────────────────────
+  // Team MT GP South Vaal – Nozipho Mzoneli
+  mk('m23','g20','Kamohelo','Ndaba','kamohelondaba60@gmail.com','General Merchandiser','MEMBER','Team MT GP South Vaal','GP'),
+  mk('m24','g20','Julia','Manyesa','Manyesajulia302@gmail.com','General Merchandiser','MEMBER','Team MT GP South Vaal','GP'),
+  mk('m25','g20','Ntombizodwa','Temba','NtombizodwaThemba@Iram.co.za','General Merchandiser','MEMBER','Team MT GP South Vaal','GP'),
+  // Team MT GP North/West – Brighton Mafu
+  mk('m26','g21','Thembani','Ncube','Thembani@Iram.co.za','General Merchandiser','MEMBER','Team MT GP North/West','GP'),
+  mk('m27','g21','Luka','Thamanga','Luka.Thamanga@Iram.co.za','General Merchandiser','MEMBER','Team MT GP North/West','GP'),
+  // Team MT GP East/Central – Beauty Bepe (GP members in JHB East area)
+  mk('m28','g22','Phathutshedzo','Neluheni','Phathutshedzo@Iram.co.za','Brand Ambassador','MEMBER','Team MT GP East/Central','GP'),
+  mk('m29','g22','Willington','Vilakazi','Willington@Iram.co.za','Brand Ambassador','MEMBER','Team MT GP East/Central','GP'),
+
+  // ─── GP TT PTA – Petro Thema (Trade Track PTA) ──────────────────────────────
+  mk('m30','g09','Dimakatso','Mboweni','dimakatso@Iram.co.za','General Merchandiser','MEMBER','Team GP TT PTA','GP'),
+  mk('m31','g09','Sipho','Mathenjwa','Sipho.Mathenjwa@Iram.co.za','General Merchandiser','MEMBER','Team GP TT PTA','GP'),
+  mk('m32','g09','Patrick','Mabona','Patrick.Mabona@Iram.co.za','Brand Ambassador','MEMBER','Team GP TT PTA','GP'),
+  mk('m33','g09','Johannes','Baloyi','johannesbaloyi@iram.co.za','General Merchandiser','MEMBER','Team GP TT PTA','GP'),
+  mk('m34','g09','Obakeng','Tladi','obakengt@iram.co.za','Brand Ambassador','MEMBER','Team GP TT PTA','GP'),
+  mk('m35','g09','Lesego','Phetla','Lesego.Phetla@Iram.co.za','Brand Ambassador','MEMBER','Team GP TT PTA','GP'),
+  mk('m36','g09','Tebogo','Lebotse','Tebogo.Lebotse@Iram.co.za','Learner','MEMBER','Team GP TT PTA','GP'),
+  mk('m37','g09','Solomon','Rakgwale','Solomon@Iram.co.za','Roaming Merchandiser','MEMBER','Team GP TT PTA','GP'),
+
+  // ─── MASSBUILD JHB – Dean Smith ──────────────────────────────────────────────
+  mk('m38','g10','Ayanda','Magagula','ayanda.magagula@iram.co.za','General Merchandiser','MEMBER','Team Massbuild JHB','GP'),
+  mk('m39','g10','Nompumelelo','Mahlalela','nompumelelo@Iram.co.za','General Merchandiser','MEMBER','Team Massbuild JHB','GP'),
+  mk('m40','g10','Kagiso','Mahlokwane','Kagiso.Mahlokwane@Iram.co.za','Brand Ambassador','MEMBER','Team Massbuild JHB','GP'),
+  mk('m41','g10','Mwezi','Mazaka','mwezimazaka206@gmail.com','Brand Ambassador','MEMBER','Team Massbuild JHB','GP'),
+  mk('m42','g10','Thato','Hlalele','ThatoMolapo@Iram.co.za','Brand Ambassador','MEMBER','Team Massbuild JHB','GP'),
+  mk('m43','g10','Malibongwe','Maseko','malibongwe.maseko81@gmail.com','Brand Ambassador','MEMBER','Team Massbuild JHB','GP'),
+  mk('m44','g10','Sipho','Nhlapo','siphonhlapo2022@gmail.com','Brand Ambassador','MEMBER','Team Massbuild JHB','GP'),
+  mk('m45','g10','Motshidisinyana','Mofokeng','Motshidisinyana@Iram.co.za','General Merchandiser','MEMBER','Team Massbuild JHB','GP'),
+  mk('m46','g10','Nhlanhla','Thwala','Nhlanhla.t@iram.co.za','Brand Ambassador','MEMBER','Team Massbuild JHB','GP'),
+  mk('m47','g10','Thabang','Moloi','Thabang.Moloi@Iram.co.za','Brand Ambassador','MEMBER','Team Massbuild JHB','GP'),
+  mk('m48','g10','Motheo','Setlago','motheosetlago@iram.co.za','General Merchandiser','MEMBER','Team Massbuild JHB','GP'),
+  mk('m49','g10','Lesoetsa','Madineo','lesoetsamadineo81@gmail.com','General Merchandiser','MEMBER','Team Massbuild JHB','GP'),
+  mk('m50','g10','Simphiwe','Skhosana','skhosanas@iram.co.za','Brand Ambassador','MEMBER','Team Massbuild JHB','GP'),
+
+  // ─── INLAND MEMBERS ──────────────────────────────────────────────────────────
+  // Team Lowveld (MP) – Nonhlanhla Ngobeni
+  mk('m51','g24','Sibusiso','Nkosi','Sibusiso.Nkosi@Iram.co.za','General Merchandiser','MEMBER','Team Lowveld (MP)','MP'),
+  mk('m52','g24','Siphosethu','Mnisi','mnisisiphosethu504@gmail.com','Brand Ambassador','MEMBER','Team Lowveld (MP)','MP'),
+  mk('m53','g24','Martin','Sefunda','mhaulemartin@gmail.com','Promoter','MEMBER','Team Lowveld (MP)','MP'),
+  // Team Limpopo – Leonard Thamaga (extra team)
+  mk('m54','g25','Clieton','Bvuma','clietonbvuma@iram.co.za','Brand Ambassador','MEMBER','Team Limpopo','LP'),
+  mk('m55','g25','Joseph','Hopane','josephh@iram.co.za','General Merchandiser','MEMBER','Team Limpopo','LP'),
+  // Team NW RustenB – Petro Themba
+  mk('m56','g26','Bokamoso','Chauke','bokamoso@iram.co.za','Brand Ambassador','MEMBER','Team NW RustenB','NW'),
+  // Team Northern Cape – Thabo Banda
+  mk('m57','g27','Masilonyana','Tlhakudi','tlhakudiaggrey@gmail.com','General Merchandiser','MEMBER','Team Northen Cape','NC'),
+  // Team Free State – Mpolokeng Lekgari
+  mk('m58','g28','Kegomoditswe','Matutu','Kegomoditswe@Iram.co.za','Brand Ambassador','MEMBER','Team Free State','FS'),
+  mk('m59','g28','Mojalefa','Moabi','moabimojalefa77@gmail.com','Brand Ambassador','MEMBER','Team Free State','FS'),
+  ];
+}
+
+// ─── INIT ───────────────────────────────────────────────────────────────────
+loadState();
+if(orgNodes.length===0){orgNodes=getInitialOrg();saveState();}
+render();
+</script>
+</body>
+</html>
