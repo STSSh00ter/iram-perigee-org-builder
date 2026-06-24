@@ -95,8 +95,8 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#eef2f7;color:#1e293b;he
 .node-no-email{font-size:9px;color:#dc2626;margin-top:3px;padding-left:10px;font-weight:700;opacity:.7}
 .node-leave{font-size:9px;color:#7c3aed;margin-top:2px;padding-left:10px;font-weight:600}
 .node-slot{position:relative;display:inline-block}
-/* Upward arrow on each connector line — shows "reports to" direction */
-.node-slot::before{content:'';position:absolute;top:-10px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-bottom:7px solid #64748b;z-index:5;pointer-events:none}
+/* Upward arrow midway on vertical connector — shows "reports to" direction */
+.node-slot::before{content:'';position:absolute;top:-19px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:4px solid transparent;border-right:4px solid transparent;border-bottom:6px solid #94a3b8;z-index:5;pointer-events:none}
 .node-slot.root-slot::before{display:none}
 .node-add-btn{position:absolute;bottom:-14px;left:50%;transform:translateX(-50%);width:28px;height:28px;border-radius:50%;background:#2563eb;color:#fff;border:2px solid #fff;cursor:pointer;font-size:18px;line-height:1;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(37,99,235,.5);z-index:10;transition:.15s;opacity:0;pointer-events:none}
 .node-slot:hover .node-add-btn{opacity:1;pointer-events:auto}
