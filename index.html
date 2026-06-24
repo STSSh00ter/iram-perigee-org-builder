@@ -94,6 +94,11 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#eef2f7;color:#1e293b;he
 .node-add-btn{position:absolute;bottom:-14px;left:50%;transform:translateX(-50%);width:28px;height:28px;border-radius:50%;background:#2563eb;color:#fff;border:2px solid #fff;cursor:pointer;font-size:18px;line-height:1;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(37,99,235,.5);z-index:10;transition:.15s;opacity:0;pointer-events:none}
 .node-slot:hover .node-add-btn{opacity:1;pointer-events:auto}
 .node-add-btn:hover{background:#1d4ed8;transform:translateX(-50%) scale(1.12)}
+.node-shift{position:absolute;top:50%;transform:translateY(-50%);width:22px;height:22px;border-radius:50%;background:#64748b;color:#fff;border:2px solid #fff;cursor:pointer;font-size:11px;line-height:1;display:flex;align-items:center;justify-content:center;z-index:10;opacity:0;pointer-events:none;transition:.15s;box-shadow:0 1px 5px rgba(0,0,0,.25)}
+.node-slot:hover .node-shift{opacity:1;pointer-events:auto}
+.node-shift:hover{background:#374151;transform:translateY(-50%) scale(1.15)}
+.node-shift-l{left:-13px}
+.node-shift-r{right:-13px}
 .drop-root-zone{border:2px dashed #94a3b8;border-radius:10px;padding:10px 16px;font-size:11px;color:#94a3b8;text-align:center;margin-bottom:16px;transition:.2s;display:none}
 .drop-root-zone.visible{display:block}.drop-root-zone.over{border-color:#059669;color:#059669;background:#f0fdf4}
 .role-reg{background:#7c3aed}.role-chan{background:#c2410c}.role-area{background:#b45309}.role-tl{background:#047857}.role-mem{background:#1d4ed8}.role-grp{background:#475569}
@@ -912,6 +917,18 @@ window.addEventListener('resize',()=>document.querySelectorAll('.ac-list.open').
   panel.addEventListener('touchend',()=>{panning=false;});
 })();
 
+function shiftNode(id,dir){
+  const node=getNode(id);if(!node)return;
+  const siblings=node.parentId?getChildren(node.parentId):getRoots();
+  const idx=siblings.findIndex(n=>n.id===id);
+  const targetIdx=idx+dir;
+  if(targetIdx<0||targetIdx>=siblings.length)return;
+  const other=siblings[targetIdx];
+  const ai=orgNodes.indexOf(node),bi=orgNodes.indexOf(other);
+  if(ai===-1||bi===-1)return;
+  [orgNodes[ai],orgNodes[bi]]=[orgNodes[bi],orgNodes[ai]];
+  saveState();render();
+}
 function liWrap(childId,visibleIds,matchIds){
   const cn=getNode(childId);
   const cls=cn&&cn.roleType==='TEAM_GROUP'?' class="grp-child"':'';
@@ -930,6 +947,7 @@ function renderTreeNode(nodeId,visibleIds,matchIds){
     if(visibleCh.length)childrenHTML=`<ul>${visibleCh.map(c=>liWrap(c.id,visibleIds,matchIds)).join('')}</ul>`;
     return`<div>
       <div class="node-slot">
+      <button class="node-shift node-shift-l" onclick="event.stopPropagation();shiftNode('${nodeId}',-1)" title="Move left">◀</button>
       <div class="node-card is-group${isSel?' selected':''}${isDimmed?' dimmed':''}"
         data-node="${nodeId}" draggable="true"
         ondragstart="onDragStart(event,'${nodeId}')" ondragover="onDragOver(event,'${nodeId}')"
@@ -938,6 +956,7 @@ function renderTreeNode(nodeId,visibleIds,matchIds){
         <div class="node-name">📁 ${node.teamName||'(team group)'}</div>
         ${provs.length?`<div class="node-provs" style="text-align:center;padding-left:0;margin-top:4px">${provs.join(' · ')}</div>`:''}
       </div>
+      <button class="node-shift node-shift-r" onclick="event.stopPropagation();shiftNode('${nodeId}',1)" title="Move right">▶</button>
       <button class="node-add-btn" onclick="event.stopPropagation();addChildNode('${nodeId}')" title="Add member">+</button>
       </div>
       ${childrenHTML}
@@ -953,6 +972,7 @@ function renderTreeNode(nodeId,visibleIds,matchIds){
   if(visibleCh.length)childrenHTML=`<ul>${visibleCh.map(c=>liWrap(c.id,visibleIds,matchIds)).join('')}</ul>`;
   return`<div>
     <div class="node-slot">
+    <button class="node-shift node-shift-l" onclick="event.stopPropagation();shiftNode('${nodeId}',-1)" title="Move left">◀</button>
     <div class="node-card${isSel?' selected':''}${isNip?' nip':''}${isDimmed?' dimmed':''}"
       data-node="${nodeId}" draggable="true"
       ondragstart="onDragStart(event,'${nodeId}')" ondragover="onDragOver(event,'${nodeId}')"
@@ -971,6 +991,7 @@ function renderTreeNode(nodeId,visibleIds,matchIds){
       ${provs.length?`<div class="node-provs">${provs.join(' · ')}</div>`:''}
       ${hiddenCount>0?`<div style="font-size:9px;color:#94a3b8;margin-top:3px;padding-left:10px">+${hiddenCount} hidden by filter</div>`:''}
     </div>
+    <button class="node-shift node-shift-r" onclick="event.stopPropagation();shiftNode('${nodeId}',1)" title="Move right">▶</button>
     <button class="node-add-btn" onclick="event.stopPropagation();addChildNode('${nodeId}')" title="Add subordinate">+</button>
     </div>
     ${childrenHTML}
