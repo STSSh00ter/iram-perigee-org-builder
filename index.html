@@ -112,10 +112,9 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#eef2f7;color:#1e293b;he
 .node-card.is-group.selected{border-color:#2563eb;border-style:dashed;box-shadow:0 0 0 3px rgba(37,99,235,.18)}
 .node-card.is-group .node-name{font-size:11px;font-weight:800;color:#475569;letter-spacing:.04em;text-transform:uppercase;padding-left:0;margin-top:0}
 .node-card.is-group .drag-handle{display:none}
-/* Dashed connector lines to group child nodes */
-li.grp-child::before,li.grp-child::after{border-top-style:dashed!important;border-color:#94a3b8!important}
-li.grp-child::before{border-right-style:dashed!important}
-li.grp-child::after{border-left-style:dashed!important}
+/* Dashed horizontal arms only to group child nodes — vertical connectors stay solid */
+li.grp-child::before,li.grp-child::after{border-top-style:dashed!important;border-top-color:#94a3b8!important}
+li.grp-child::before{border-right-style:dashed!important;border-right-color:#94a3b8!important}
 /* Edit panel */
 .edit-panel{width:340px;background:#fff;border-left:1px solid #e2e8f0;display:flex;flex-direction:column;overflow:hidden;flex-shrink:0;transition:width .25s ease}
 .edit-panel.collapsed{width:36px}
