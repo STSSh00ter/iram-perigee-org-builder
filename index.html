@@ -87,6 +87,8 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#eef2f7;color:#1e293b;he
 .node-extra-teams{font-size:9px;color:#7c3aed;margin-top:2px;padding-left:10px;font-style:italic;font-weight:600}
 .node-assist{font-size:9px;color:#b45309;margin-top:2px;padding-left:10px;font-style:italic}
 .node-provs{font-size:9px;color:#059669;margin-top:2px;padding-left:10px;font-weight:700}
+.node-no-email{font-size:9px;color:#dc2626;margin-top:3px;padding-left:10px;font-weight:700;opacity:.7}
+.node-leave{font-size:9px;color:#7c3aed;margin-top:2px;padding-left:10px;font-weight:600}
 .node-slot{position:relative;display:inline-block}
 .node-add-btn{position:absolute;bottom:-14px;left:50%;transform:translateX(-50%);width:28px;height:28px;border-radius:50%;background:#2563eb;color:#fff;border:2px solid #fff;cursor:pointer;font-size:18px;line-height:1;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(37,99,235,.5);z-index:10;transition:.15s;opacity:0;pointer-events:none}
 .node-slot:hover .node-add-btn{opacity:1;pointer-events:auto}
@@ -414,8 +416,11 @@ function renderFilterBar(){
 
 function makeNode(parentId=null){
   return{id:uid(),parentId,email:'',firstName:'',lastName:'',jobTitle:'',roleType:'MEMBER',
-    teamName:'',assignedProvinces:'',extraTeams:[],assistingNote:'',notInPerigee:false};
+    teamName:'',assignedProvinces:'',extraTeams:[],assistingNote:'',notInPerigee:false,
+    leaveType:'',leaveStart:'',leaveEnd:''};
 }
+function fmtDate(d){if(!d)return'';const[y,m,dy]=d.split('-');return`${dy}/${m}/${y}`;}
+function todayStr(){return new Date().toISOString().slice(0,10);}
 function addRootNode(){openModal(null);}
 function addChildNode(parentId){if(!parentId)return;openModal(parentId);}
 function insertNode(node){
@@ -588,6 +593,14 @@ function collectFormInto(node,pfx){
     }
   }
   node.notInPerigee=perigeeUsers.length>0&&!!node.email&&!findPerigeeUser(node.email);
+  // Leave fields
+  node.leaveType=(document.getElementById(pfx+'leaveType')?.value||'');
+  node.leaveStart=(document.getElementById(pfx+'leaveStart')?.value||'');
+  node.leaveEnd=(document.getElementById(pfx+'leaveEnd')?.value||'');
+  if(node.leaveStart&&node.leaveStart<todayStr()){
+    toast('Leave start date must be today or a future date — cleared','warn');
+    node.leaveType='';node.leaveStart='';node.leaveEnd='';
+  }
 }
 
 function onRoleChange(pfx){
@@ -689,6 +702,33 @@ function buildFormHTML(node,pfx){
     <div class="fg">
       <label class="fl">Assigned Province(s)</label>
       <div class="prov-chip-group">${provChips}</div>
+    </div>
+    <div class="section-div">Leave (future dates only)</div>
+    <div class="fg">
+      <label class="fl">Leave Type</label>
+      <select id="${pfx}leaveType" class="fc" onchange="onLeaveTypeChange('${pfx}')">
+        <option value="">— No Leave Scheduled —</option>
+        <option value="Annual Leave"${node.leaveType==='Annual Leave'?' selected':''}>Annual Leave</option>
+        <option value="Sick Leave"${node.leaveType==='Sick Leave'?' selected':''}>Sick Leave</option>
+        <option value="Maternity Leave"${node.leaveType==='Maternity Leave'?' selected':''}>Maternity Leave</option>
+        <option value="Paternity Leave"${node.leaveType==='Paternity Leave'?' selected':''}>Paternity Leave</option>
+        <option value="Study Leave"${node.leaveType==='Study Leave'?' selected':''}>Study Leave</option>
+        <option value="Family Responsibility"${node.leaveType==='Family Responsibility'?' selected':''}>Family Responsibility</option>
+        <option value="Unpaid Leave"${node.leaveType==='Unpaid Leave'?' selected':''}>Unpaid Leave</option>
+        <option value="Other"${node.leaveType==='Other'?' selected':''}>Other</option>
+      </select>
+    </div>
+    <div id="${pfx}leaveDatesSection" style="display:${node.leaveType?'':'none'}">
+      <div class="form-row">
+        <div class="fg">
+          <label class="fl">Leave Start</label>
+          <input type="date" id="${pfx}leaveStart" class="fc" min="${todayStr()}" value="${node.leaveStart||''}" onchange="onLeaveStartChange('${pfx}')">
+        </div>
+        <div class="fg">
+          <label class="fl">Leave End</label>
+          <input type="date" id="${pfx}leaveEnd" class="fc" min="${node.leaveStart||todayStr()}" value="${node.leaveEnd||''}">
+        </div>
+      </div>
     </div>
     ${pfx.startsWith('ep_')?`
       <div class="section-div">Reports To</div>
@@ -848,7 +888,8 @@ function renderTreeNode(nodeId,visibleIds,matchIds){
       ${isNip?`<div class="nip-pip" title="Not in Perigee">!</div>`:''}
       <div class="node-name">${dispName}</div>
       <div class="node-title">${node.jobTitle||'<span style="color:#cbd5e1">No title</span>'}</div>
-      ${node.email?`<div class="node-email">${node.email}</div>`:''}
+      ${node.email?`<div class="node-email">${node.email}</div>`:`<div class="node-no-email">⚠ no email set</div>`}
+      ${node.leaveType?`<div class="node-leave">🏖 ${node.leaveType}${node.leaveStart?' · '+fmtDate(node.leaveStart):''}</div>`:''}
       ${node.teamName?`<div class="node-team">${node.teamName}</div>`:''}
       ${extras.length?`<div class="node-extra-teams">▲ Also: ${extras.join(' · ')}</div>`:''}
       ${node.assistingNote?`<div class="node-assist">↗ ${node.assistingNote}</div>`:''}
@@ -940,7 +981,10 @@ function exportExcel(){
       'FIRST NAME':node.firstName,'SURNAME':node.lastName,
       'STATUS':pu?pu.status:(node.notInPerigee?'NOT IN PERIGEE':'ACTIVE'),
       'ASSIGNED PROVINCES':node.assignedProvinces,
-      'JOB TITLE':node.jobTitle,'LEAVE TYPE':'','LEAVE START':'','LEAVE END':'',
+      'JOB TITLE':node.jobTitle,
+      'LEAVE TYPE':node.leaveType||'',
+      'LEAVE START':node.leaveStart?fmtDate(node.leaveStart):'',
+      'LEAVE END':node.leaveEnd?fmtDate(node.leaveEnd):'',
       'TEAM NAME':node.teamName,
       'TEAM LEADER':node.roleType==='TEAM_LEADER'?fmtPerson(node):fmtPerson(tl),
       'ASM':node.roleType==='AREA_MANAGER'?fmtPerson(node):fmtPerson(asm),
@@ -993,6 +1037,16 @@ function toast(msg,type='info'){
   el.className=`toast toast-${type}`;el.textContent=msg;c.appendChild(el);
   setTimeout(()=>{el.style.opacity='0';el.style.transition='opacity .4s';setTimeout(()=>el.remove(),400);},3500);
 }
+function onLeaveTypeChange(pfx){
+  const v=document.getElementById(pfx+'leaveType').value;
+  document.getElementById(pfx+'leaveDatesSection').style.display=v?'':'none';
+}
+function onLeaveStartChange(pfx){
+  const s=document.getElementById(pfx+'leaveStart').value;
+  const endEl=document.getElementById(pfx+'leaveEnd');
+  if(s){endEl.min=s;if(endEl.value&&endEl.value<s)endEl.value=s;}
+}
+
 function reparentNode(newParentId){
   if(!selectedNodeId)return;
   const node=getNode(selectedNodeId);if(!node)return;
@@ -1132,6 +1186,7 @@ function getInitialOrg(){
     email:(email||'').toLowerCase(),jobTitle:job||'',roleType:role||'MEMBER',
     teamName:team||'',assignedProvinces:provs||'',
     extraTeams:extra||[],assistingNote:assist||'',notInPerigee:false,
+    leaveType:'',leaveStart:'',leaveEnd:'',
   });
   return[
   // ─── MANAGEMENT LAYER ───────────────────────────────────────────────────────
