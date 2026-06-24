@@ -360,7 +360,8 @@ async function syncPerigeeToCloud(){
   if(!_supa||!perigeeUsers.length)return;
   try{
     const slim=perigeeUsers.map(u=>({email:u.email,firstName:u.firstName,lastName:u.lastName,status:u.status,access:u.access}));
-    await _supa.from('iram_org_state').upsert({id:'perigee',nodes:slim,updated_at:new Date().toISOString(),updated_by:getDeviceId()},{onConflict:'id'});
+    const{error}=await _supa.from('iram_org_state').upsert({id:'perigee',nodes:slim,updated_at:new Date().toISOString(),updated_by:getDeviceId()},{onConflict:'id'});
+    if(error)console.warn('Perigee sync error:',error.message||error);
   }catch(e){console.warn('Perigee sync error:',e);}
 }
 
@@ -1566,7 +1567,8 @@ function setSyncStatus(msg,color){
 async function syncToCloud(){
   if(!_supa)return;
   try{
-    await _supa.from('iram_org_state').upsert({id:'main',nodes:orgNodes,updated_at:new Date().toISOString(),updated_by:getDeviceId()},{onConflict:'id'});
+    const{error}=await _supa.from('iram_org_state').upsert({id:'main',nodes:orgNodes,updated_at:new Date().toISOString(),updated_by:getDeviceId()},{onConflict:'id'});
+    if(error)throw error;
     setSyncStatus('☁ synced '+new Date().toLocaleTimeString(),'#059669');
   }catch(e){setSyncStatus('☁ sync failed','#dc2626');console.warn('Supabase sync error:',e);}
 }
@@ -1602,15 +1604,17 @@ async function forcePush(){
   setSyncStatus('☁ pushing…','#f59e0b');
   try{
     const slim=perigeeUsers.map(u=>({email:u.email,firstName:u.firstName,lastName:u.lastName,status:u.status,access:u.access}));
-    await Promise.all([
+    const[r1,r2]=await Promise.all([
       _supa.from('iram_org_state').upsert({id:'main',nodes:orgNodes,updated_at:new Date().toISOString(),updated_by:getDeviceId()},{onConflict:'id'}),
-      slim.length?_supa.from('iram_org_state').upsert({id:'perigee',nodes:slim,updated_at:new Date().toISOString(),updated_by:getDeviceId()},{onConflict:'id'}):Promise.resolve()
+      slim.length?_supa.from('iram_org_state').upsert({id:'perigee',nodes:slim,updated_at:new Date().toISOString(),updated_by:getDeviceId()},{onConflict:'id'}):Promise.resolve({error:null})
     ]);
+    if(r1&&r1.error)throw r1.error;
+    if(r2&&r2.error)throw r2.error;
     setSyncStatus('☁ synced '+new Date().toLocaleTimeString(),'#059669');
-    toast('Pushed — other devices will update automatically ✓','success');
+    toast(`Pushed ${orgNodes.length} nodes — other devices will update ✓`,'success');
   }catch(e){
     setSyncStatus('☁ push failed','#dc2626');
-    toast('Push failed: '+e.message,'error');
+    toast('Push failed: '+(e.message||e.hint||'permission/connection error'),'error');
   }
   if(btn){btn.disabled=false;btn.textContent='☁ Push to All';}
   _pushing=false;
