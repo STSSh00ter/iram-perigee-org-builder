@@ -328,7 +328,21 @@ function getAncestorOfRole(nodeId,roleType){
   while(n&&n.parentId){n=getNode(n.parentId);if(n&&n.roleType===roleType)return n;}
   return null;
 }
-function getTeamLeaderFor(id){const s=getNode(id);if(s&&s.roleType==='TEAM_LEADER')return s;return getAncestorOfRole(id,'TEAM_LEADER');}
+function getTeamLeaderFor(id){
+  const s=getNode(id);if(s&&s.roleType==='TEAM_LEADER')return s;
+  // Walk ancestors — if we pass through a TEAM_GROUP, the group's parent is the effective leader
+  let n=getNode(id);
+  while(n&&n.parentId){
+    const p=getNode(n.parentId);if(!p)break;
+    if(p.roleType==='TEAM_LEADER')return p;
+    if(p.roleType==='TEAM_GROUP'){
+      const above=getNode(p.parentId);
+      if(above&&isLeaderRole(above.roleType))return above;
+    }
+    n=p;
+  }
+  return null;
+}
 function getASMFor(id){return getAncestorOfRole(id,'AREA_MANAGER');}
 function getRegMgrFor(id){return getAncestorOfRole(id,'REGIONAL_MANAGER');}
 
@@ -336,9 +350,13 @@ function getRegMgrFor(id){return getAncestorOfRole(id,'REGIONAL_MANAGER');}
 function getTeamLeaderForExport(nodeId, teamName){
   let n=getNode(nodeId);
   while(n){
-    if(n.teamName===teamName||(n.extraTeams||[]).includes(teamName)){
-      // This ancestor claims the team — return them if they're a leader role
-      if(isLeaderRole(n.roleType)) return n;
+    // TEAM_GROUP whose name matches → its parent is the leader for this team
+    if(n.roleType==='TEAM_GROUP'&&n.teamName===teamName){
+      const above=getNode(n.parentId);
+      if(above&&isLeaderRole(above.roleType))return above;
+    }
+    if((n.teamName===teamName||(n.extraTeams||[]).includes(teamName))&&isLeaderRole(n.roleType)){
+      return n;
     }
     if(!n.parentId) break;
     n=getNode(n.parentId);
