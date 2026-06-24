@@ -485,8 +485,13 @@ function clearAll(){
 }
 
 function onDragStart(event,nodeId){
-  draggedNodeId=nodeId;event.dataTransfer.effectAllowed='move';event.dataTransfer.setData('text/plain',nodeId);
-  setTimeout(()=>{const el=document.querySelector(`[data-node="${nodeId}"]`);if(el)el.classList.add('dragging');},0);
+  draggedNodeId=nodeId;
+  event.dataTransfer.effectAllowed='move';
+  event.dataTransfer.setData('text/plain',nodeId);
+  // Pin ghost image to just the card — not the whole subtree wrapper
+  const cardEl=document.querySelector(`[data-node="${nodeId}"]`);
+  if(cardEl) event.dataTransfer.setDragImage(cardEl, cardEl.offsetWidth/2, 28);
+  setTimeout(()=>{if(cardEl)cardEl.classList.add('dragging');},0);
   const dz=document.getElementById('dropRootZone');if(dz)dz.classList.add('visible');
 }
 function onDragOver(event,targetId){
