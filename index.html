@@ -207,11 +207,17 @@ ul.grp-children::before{border-left-style:dashed!important;border-color:#94a3b8!
 .conflict-note{background:#fef3c7;border:1px solid #f59e0b;border-radius:6px;padding:7px 10px;font-size:10px;color:#78350f;margin-bottom:8px}
 .conflict-note b{display:block;margin-bottom:2px}
 /* Admin panel */
-.admin-tabs{display:flex;border-bottom:1px solid #e2e8f0;margin:-18px -20px 14px;padding:0 20px}
-.admin-tab{padding:10px 16px;border:none;background:none;font-size:12px;font-weight:700;color:#64748b;cursor:pointer;border-bottom:3px solid transparent;transition:.15s}
-.admin-tab:hover{color:#1e293b}
-.admin-tab.active{color:#2563eb;border-bottom-color:#2563eb}
-.admin-content{max-height:58vh;overflow-y:auto}
+.admin-tabs{display:flex;border-bottom:2px solid #e2e8f0;margin:-18px -24px 18px;padding:0 24px;gap:2px}
+.admin-tab{padding:12px 20px;border:none;background:none;font-size:13px;font-weight:700;color:#64748b;cursor:pointer;border-bottom:3px solid transparent;transition:.15s;white-space:nowrap}
+.admin-tab:hover{color:#1e293b;background:#f8fafc}
+.admin-tab.active{color:#2563eb;border-bottom-color:#2563eb;background:#eff6ff}
+.admin-content{max-height:65vh;overflow-y:auto}
+.admin-table{width:100%;font-size:12.5px;border-collapse:collapse}
+.admin-table thead tr{background:#f8fafc;position:sticky;top:0;z-index:2}
+.admin-table th{padding:9px 12px;text-align:left;border-bottom:2px solid #e2e8f0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#64748b;white-space:nowrap}
+.admin-table td{padding:7px 12px;border-bottom:1px solid #f1f5f9;vertical-align:middle}
+.admin-table tbody tr:hover{background:#f8fafc}
+.audit-badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:9.5px;font-weight:800;color:#fff;letter-spacing:.04em}
 /* Delete confirmation */
 .del-info{background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px 14px;margin-bottom:12px}
 .del-info-title{font-weight:800;color:#991b1b;font-size:12px;margin-bottom:5px}
@@ -387,12 +393,12 @@ body.mobile-layout .modal{width:96vw;max-height:90vh}
 </div>
 <!-- Admin panel modal -->
 <div class="overlay" id="adminModal">
-  <div class="modal" style="width:760px;max-width:96vw">
-    <div class="modal-hdr" style="display:flex;justify-content:space-between;align-items:center">
-      <div><h3>🔒 Admin Panel</h3><p id="adminDeviceLabel">Device ID: loading…</p></div>
+  <div class="modal" style="width:920px;max-width:97vw">
+    <div class="modal-hdr" style="display:flex;justify-content:space-between;align-items:center;padding:18px 24px 14px">
+      <div><h3 style="margin:0;font-size:16px">🔒 Admin Panel</h3><p id="adminDeviceLabel" style="margin:3px 0 0;font-size:11px;color:#94a3b8;font-family:monospace">Device ID: loading…</p></div>
       <button class="btn btn-ghost btn-sm" onclick="closeAdmin()">✕ Close</button>
     </div>
-    <div class="modal-body" style="padding-top:0">
+    <div class="modal-body" style="padding:0 24px 20px">
       <div class="admin-tabs">
         <button id="adminTabLog" class="admin-tab active" onclick="switchAdminTab('log')">📋 Audit Log</button>
         <button id="adminTabTrash" class="admin-tab" onclick="switchAdminTab('trash')">🗑 Deleted Items</button>
@@ -1519,26 +1525,26 @@ function switchAdminTab(tab){
     const rows=log.slice().reverse().slice(0,300);
     const actionColor={ADD:'#059669',UPDATE:'#2563eb',DELETE:'#dc2626',RESTORE:'#7c3aed',HARD_DELETE:'#991b1b'};
     document.getElementById('adminContent').innerHTML=`
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <span style="font-size:11px;color:#64748b">${log.length} total entries</span>
-        <button class="btn btn-sm" style="background:#f1f5f9;color:#64748b;font-size:11px" onclick="clearAuditLog()">🗑 Clear Log</button>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <span style="font-size:12px;color:#64748b;font-weight:600">${log.length} total entries</span>
+        <button class="btn btn-sm" style="background:#f1f5f9;color:#64748b;font-size:12px;gap:5px" onclick="clearAuditLog()">🗑 Clear Log</button>
       </div>
-      <table style="width:100%;font-size:11px;border-collapse:collapse">
-        <thead><tr style="background:#f8fafc;position:sticky;top:0">
-          <th style="padding:6px 8px;text-align:left;border-bottom:2px solid #e2e8f0">Action</th>
-          <th style="padding:6px 8px;text-align:left;border-bottom:2px solid #e2e8f0">Person</th>
-          <th style="padding:6px 8px;text-align:left;border-bottom:2px solid #e2e8f0">Team</th>
-          <th style="padding:6px 8px;text-align:left;border-bottom:2px solid #e2e8f0">When</th>
-          <th style="padding:6px 8px;text-align:left;border-bottom:2px solid #e2e8f0">Device</th>
+      <table class="admin-table">
+        <thead><tr>
+          <th>Action</th>
+          <th>Person</th>
+          <th>Team</th>
+          <th>When</th>
+          <th>Device</th>
         </tr></thead>
-        <tbody>${rows.map(e=>`<tr style="border-bottom:1px solid #f8fafc">
-          <td style="padding:5px 8px"><span style="display:inline-block;padding:1px 7px;border-radius:12px;font-size:9px;font-weight:800;color:#fff;background:${actionColor[e.action]||'#94a3b8'}">${e.action}</span></td>
-          <td style="padding:5px 8px;font-weight:600;color:#1e293b">${e.name||e.email||'—'}</td>
-          <td style="padding:5px 8px;color:#64748b">${e.team||'—'}</td>
-          <td style="padding:5px 8px;color:#94a3b8;white-space:nowrap">${new Date(e.timestamp).toLocaleString()}</td>
-          <td style="padding:5px 8px;color:#94a3b8;font-size:10px">${(e.deviceId||'').slice(0,20)}</td>
+        <tbody>${rows.map(e=>`<tr>
+          <td><span class="audit-badge" style="background:${actionColor[e.action]||'#94a3b8'}">${e.action}</span></td>
+          <td style="font-weight:600;color:#1e293b">${e.name||e.email||'—'}</td>
+          <td style="color:#64748b">${e.team||'—'}</td>
+          <td style="color:#94a3b8;white-space:nowrap;font-size:11.5px">${new Date(e.timestamp).toLocaleString()}</td>
+          <td style="color:#94a3b8;font-size:11px;font-family:monospace">${(e.deviceId||'').slice(0,18)}</td>
         </tr>`).join('')}
-        ${rows.length===0?'<tr><td colspan="5" style="padding:30px;text-align:center;color:#94a3b8">No audit entries yet</td></tr>':''}
+        ${rows.length===0?'<tr><td colspan="5" style="padding:40px;text-align:center;color:#94a3b8;font-size:13px">No audit entries yet</td></tr>':''}
         </tbody></table>`;
   } else {
     document.getElementById('adminContent').innerHTML=`
