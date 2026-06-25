@@ -295,7 +295,12 @@ body.mobile-layout .modal{width:96vw;max-height:90vh}
   body,html{overflow:visible!important;height:auto!important;background:#fff!important}
   .main{display:block!important;overflow:visible!important;height:auto!important}
   .tree-panel{overflow:visible!important;height:auto!important;padding:20px!important;cursor:default!important}
-  .org-wrap{min-width:unset!important}
+  .org-wrap{
+    min-width:unset!important;
+    transform:scale(var(--print-scale,1));
+    transform-origin:top left;
+  }
+  @page{size:auto;margin:10mm}
   .node-card{box-shadow:0 1px 4px rgba(0,0,0,.12)!important;break-inside:avoid}
 }
 </style>
@@ -1340,7 +1345,19 @@ function cycleNipNodes(){
 
 function exportPDF(){
   if(!orgNodes.length){toast('Tree is empty — nothing to print','error');return;}
+  const wrap=document.querySelector('.org-wrap');
+  const panel=document.getElementById('treePanel');
+  if(wrap&&panel){
+    const availW=panel.clientWidth;   // visible panel width ≈ print page width
+    const treeW=wrap.scrollWidth;
+    const treeH=wrap.scrollHeight;
+    const scaleX=availW/treeW;
+    // don't upscale, only shrink if tree is wider than panel
+    const scale=Math.min(scaleX,1);
+    wrap.style.setProperty('--print-scale',scale);
+  }
   window.print();
+  if(wrap) wrap.style.removeProperty('--print-scale');
 }
 
 function exportExcel(){
