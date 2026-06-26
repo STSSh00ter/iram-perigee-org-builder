@@ -97,6 +97,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#eef2f7;color:#1e293b;he
 .node-title{font-size:10px;color:#64748b;margin-top:2px;padding-left:10px}
 .node-email{font-size:9px;color:#94a3b8;margin-top:3px;word-break:break-all;padding-left:10px}
 .node-team{font-size:10px;color:#2563eb;margin-top:3px;font-style:italic;font-weight:600;padding-left:10px}
+.node-member-of{font-size:10px;color:#0891b2;margin-top:2px;font-weight:600;padding-left:10px}
 .node-extra-teams{font-size:9px;color:#7c3aed;margin-top:2px;padding-left:10px;font-style:italic;font-weight:600}
 .node-assist{font-size:9px;color:#b45309;margin-top:2px;padding-left:10px;font-style:italic}
 .node-provs{font-size:9px;color:#059669;margin-top:2px;padding-left:10px;font-weight:700}
@@ -115,6 +116,7 @@ body.compact-view .node-leave,
 body.compact-view .drag-handle{display:none}
 body.compact-view .node-name{font-size:13px;margin-top:6px;padding-left:0;line-height:1.2}
 body.compact-view .node-team{font-size:10px;margin-top:3px;padding-left:0}
+body.compact-view .node-member-of{font-size:10px;margin-top:2px;padding-left:0}
 body.compact-view .node-card{text-align:center}
 body.compact-view .node-badge{font-size:8px;padding:2px 8px}
 body.mobile-layout.compact-view .node-card{width:128px}
@@ -167,7 +169,7 @@ body.mobile-layout.compact-view .node-name{font-size:12px}
 .node-card.is-group:hover{box-shadow:0 2px 10px rgba(0,0,0,.1);transform:translateY(-1px)}
 .node-card.is-group.selected{border-color:#2563eb;border-style:dashed;box-shadow:0 0 0 3px rgba(37,99,235,.18)}
 .node-card.is-group .node-name{font-size:11px;font-weight:800;color:#475569;letter-spacing:.04em;text-transform:uppercase;padding-left:0;margin-top:0}
-.node-card.is-group .drag-handle{display:none}
+.node-card.is-group .drag-handle{color:#94a3b8;opacity:.7}
 /* Group node: horizontal arms stay solid — only the vertical stem DOWN to group's children is dashed */
 ul.grp-children::before{border-left-style:dashed!important;border-color:#94a3b8!important}
 /* Edit panel */
@@ -650,8 +652,13 @@ function renderFilterBar(){
 
 function makeNode(parentId=null){
   return{id:uid(),parentId,email:'',firstName:'',lastName:'',jobTitle:'',roleType:'MEMBER',
-    teamName:'',assignedProvinces:'',extraTeams:[],assistingNote:'',notInPerigee:false,
+    teamName:'',assignedProvinces:'',extraTeams:[],assistingNote:'',memberOfTeam:'',notInPerigee:false,
     leaveType:'',leaveStart:'',leaveEnd:'',resigned:false,resignedDate:''};
+}
+function getParentGroupName(id){
+  let n=getNode(id);
+  while(n&&n.parentId){n=getNode(n.parentId);if(n&&n.roleType==='TEAM_GROUP')return n.teamName||null;}
+  return null;
 }
 function fmtDate(d){if(!d)return'';const[y,m,dy]=d.split('-');return`${dy}/${m}/${y}`;}
 function todayStr(){return new Date().toISOString().slice(0,10);}
@@ -843,6 +850,8 @@ function collectFormInto(node,pfx){
     }
   }
   node.notInPerigee=perigeeUsers.length>0&&!!node.email&&!findPerigeeUser(node.email);
+  const motEl=document.getElementById(pfx+'memberOfTeam');
+  if(motEl)node.memberOfTeam=motEl.value;
   // Leave fields
   node.leaveType=(document.getElementById(pfx+'leaveType')?.value||'');
   node.leaveStart=(document.getElementById(pfx+'leaveStart')?.value||'');
@@ -888,6 +897,10 @@ function buildFormHTML(node,pfx){
   const teams=allTeamNames();
   const isLeader=isLeaderRole(node.roleType);
   const isGroup=node.roleType==='TEAM_GROUP';
+  const parentNode=node.parentId?getNode(node.parentId):null;
+  const hasGroupParent=!!(parentNode&&parentNode.roleType==='TEAM_GROUP');
+  const groupTeams=[...new Set(orgNodes.filter(n=>n.roleType==='TEAM_GROUP').map(n=>n.teamName).filter(Boolean))].sort();
+  const memberOfOpts=groupTeams.map(t=>`<option value="${t}"${node.memberOfTeam===t?' selected':''}>${t}</option>`).join('');
   const provChips=PROVINCES.map(p=>`
     <label class="prov-chip">
       <input type="checkbox" id="${pfx}prov_${p}" value="${p}" ${nodeProv.includes(p)?'checked':''}>
@@ -908,6 +921,14 @@ function buildFormHTML(node,pfx){
     <div class="fg"><label class="fl">Team Name ${isGroup?'*':''}</label>
       <input id="${pfx}teamName" class="fc" placeholder="e.g. Team KZN Outlying" value="${node.teamName}" list="${pfx}teamList">
       <datalist id="${pfx}teamList">${teams.map(t=>`<option value="${t}">`).join('')}</datalist>
+    </div>
+    <div id="${pfx}memberOfSection" style="display:${(!isGroup&&!hasGroupParent)?'':'none'}">
+      <div class="fg"><label class="fl">Member of Group <span style="font-weight:400;text-transform:none;font-size:10px">(auto if under a group node)</span></label>
+        <select id="${pfx}memberOfTeam" class="fc">
+          <option value="">— None —</option>
+          ${memberOfOpts}
+        </select>
+      </div>
     </div>
     <div class="fg">
       <label class="fl">Assigned Province(s)</label>
@@ -1237,6 +1258,7 @@ function renderTreeNode(nodeId,visibleIds,matchIds){
         ondragstart="onDragStart(event,'${nodeId}')" ondragover="onDragOver(event,'${nodeId}')"
         ondragleave="onDragLeave(event,'${nodeId}')" ondrop="onDrop(event,'${nodeId}')"
         ondragend="onDragEnd()" onclick="selectNode('${nodeId}')">
+        <div class="drag-handle" title="Drag to reposition group">⠿</div>
         <div class="node-name">📁 ${node.teamName||'(team group)'}</div>
         ${provs.length?`<div class="node-provs" style="text-align:center;padding-left:0;margin-top:4px">${provs.join(' · ')}</div>`:''}
       </div>
@@ -1252,6 +1274,7 @@ function renderTreeNode(nodeId,visibleIds,matchIds){
   const dispName=node.firstName?(node.firstName+(node.lastName?' '+node.lastName:'')):(node.email||'(unnamed)');
   const provs=getNodeProvinces(node);const extras=node.extraTeams||[];
   const lv=node.leaveType?getLeaveVisual(node.leaveType):null;
+  const memberOfGrp=getParentGroupName(nodeId)||(node.memberOfTeam||null);
   const hiddenCount=allCh.length-visibleCh.length;
   let childrenHTML='';
   if(visibleCh.length)childrenHTML=`<ul>${visibleCh.map(c=>liWrap(c.id,visibleIds,matchIds)).join('')}</ul>`;
@@ -1273,6 +1296,7 @@ function renderTreeNode(nodeId,visibleIds,matchIds){
       ${node.email?`<div class="node-email">${node.email}</div>`:`<div class="node-no-email">⚠ no email set</div>`}
       ${lv?`<div class="node-leave" style="color:${lv.c}">${lv.e} ${node.leaveType}${node.leaveStart?' · '+fmtDate(node.leaveStart):''}</div>`:''}
       ${node.teamName?`<div class="node-team">${node.teamName}</div>`:''}
+      ${memberOfGrp&&memberOfGrp!==node.teamName?`<div class="node-member-of">📂 ${memberOfGrp}</div>`:''}
       ${extras.length?`<div class="node-extra-teams">▲ Also: ${extras.join(' · ')}</div>`:''}
       ${node.assistingNote?`<div class="node-assist">↗ ${node.assistingNote}</div>`:''}
       ${provs.length?`<div class="node-provs">${provs.join(' · ')}</div>`:''}
