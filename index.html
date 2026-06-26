@@ -866,6 +866,11 @@ function collectFormInto(node,pfx){
       node.extraTeams=[];
     }
   }
+  // If parent is a TEAM_GROUP and teamName is blank, inherit the group's name
+  if(!node.teamName&&node.parentId){
+    const par=getNode(node.parentId);
+    if(par&&par.roleType==='TEAM_GROUP'&&par.teamName)node.teamName=par.teamName;
+  }
   node.notInPerigee=perigeeUsers.length>0&&!!node.email&&!findPerigeeUser(node.email);
   const motEl=document.getElementById(pfx+'memberOfTeam');
   if(motEl)node.memberOfTeam=motEl.value;
@@ -1057,8 +1062,9 @@ function buildFormHTML(node,pfx){
         <select id="ep_parentId" class="fc" onchange="reparentNode(this.value)">
           <option value="">(Root — no parent)</option>
           ${orgNodes.filter(n=>n.id!==node.id&&!isDescendant(n.id,node.id))
-            .sort((a,b)=>(a.firstName+a.lastName).localeCompare(b.firstName+b.lastName))
-            .map(n=>`<option value="${n.id}"${n.id===node.parentId?' selected':''}>${(n.firstName+' '+n.lastName).trim()||n.email} (${getRoleInfo(n.roleType).badge})</option>`).join('')}
+            .map(n=>({n,label:n.roleType==='TEAM_GROUP'?(n.teamName||'(unnamed group)'):(((n.firstName+' '+n.lastName).trim())||n.email||'(unnamed)')}))
+            .sort((a,b)=>a.label.localeCompare(b.label))
+            .map(({n,label})=>`<option value="${n.id}"${n.id===node.parentId?' selected':''}>${label} (${getRoleInfo(n.roleType).badge})</option>`).join('')}
         </select>
       </div>
       <div class="section-div">Reporting Chain (auto)</div>
