@@ -503,7 +503,10 @@ function getAncestorOfRole(nodeId,roleType){
   return null;
 }
 function getTeamLeaderFor(id){
-  const s=getNode(id);if(s&&s.roleType==='TEAM_LEADER')return s;
+  const s=getNode(id);if(!s)return null;
+  if(s.roleType==='TEAM_LEADER')return s;
+  // For a TEAM_GROUP the parent IS the team leader by definition
+  if(s.roleType==='TEAM_GROUP')return getNode(s.parentId)||null;
   // Walk ancestors — if we pass through a TEAM_GROUP, the group's parent is the effective leader
   let n=getNode(id);
   while(n&&n.parentId){
