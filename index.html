@@ -523,8 +523,12 @@ function getAncestorOfRole(nodeId,roleType){
 function getTeamLeaderFor(id){
   const s=getNode(id);if(!s)return null;
   if(s.roleType==='TEAM_LEADER')return s;
-  // For a TEAM_GROUP the parent IS the team leader by definition
-  if(s.roleType==='TEAM_GROUP')return getNode(s.parentId)||null;
+  // For a TEAM_GROUP walk up through any nested groups to find the first person
+  if(s.roleType==='TEAM_GROUP'){
+    let p=getNode(s.parentId);
+    while(p&&p.roleType==='TEAM_GROUP')p=getNode(p.parentId);
+    return p||null;
+  }
   // Walk ancestors — if we pass through a TEAM_GROUP, the group's parent is the effective leader
   let n=getNode(id);
   while(n&&n.parentId){
@@ -676,7 +680,7 @@ function getParentGroupName(id){
   while(n&&n.parentId){
     n=getNode(n.parentId);if(!n)break;
     if(n.roleType==='TEAM_GROUP')return n.teamName||null;
-    if(n.roleType==='TEAM_LEADER'&&n.teamName)return n.teamName;
+    if(isLeaderRole(n.roleType)&&n.teamName)return n.teamName;
   }
   return null;
 }
