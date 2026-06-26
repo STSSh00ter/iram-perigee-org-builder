@@ -657,7 +657,11 @@ function makeNode(parentId=null){
 }
 function getParentGroupName(id){
   let n=getNode(id);
-  while(n&&n.parentId){n=getNode(n.parentId);if(n&&n.roleType==='TEAM_GROUP')return n.teamName||null;}
+  while(n&&n.parentId){
+    n=getNode(n.parentId);if(!n)break;
+    if(n.roleType==='TEAM_GROUP')return n.teamName||null;
+    if(n.roleType==='TEAM_LEADER'&&n.teamName)return n.teamName;
+  }
   return null;
 }
 function fmtDate(d){if(!d)return'';const[y,m,dy]=d.split('-');return`${dy}/${m}/${y}`;}
