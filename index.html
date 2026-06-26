@@ -73,7 +73,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#eef2f7;color:#1e293b;he
 .org-tree li:last-child::before{border-right:2px solid #94a3b8;border-radius:0 6px 0 0}
 .org-tree li:first-child::after{border-radius:6px 0 0 0}
 .org-tree ul::before{content:'';position:absolute;top:0;left:50%;border-left:2px solid #94a3b8;width:0;height:44px}
-.org-tree ul::after{content:'';position:absolute;top:44px;left:50%;transform:translate(-50%,-50%);width:7px;height:7px;border-radius:50%;background:#64748b;border:2px solid #eef2f7;z-index:3}
+.org-tree ul::after{content:'';position:absolute;top:44px;left:50%;transform:translate(-50%,-50%);width:7px;height:7px;border-radius:50%;background:#64748b;border:2px solid #eef2f7;z-index:3;pointer-events:none}
 .org-tree ul{padding-top:44px;position:relative;display:flex;transition:.3s}
 .org-tree li>div{display:flex;flex-direction:column;align-items:center}
 /* Root node — visually dominant so hierarchy is obvious */
@@ -169,7 +169,20 @@ body.mobile-layout.compact-view .node-name{font-size:12px}
 .node-card.is-group:hover{box-shadow:0 2px 10px rgba(0,0,0,.1);transform:translateY(-1px)}
 .node-card.is-group.selected{border-color:#2563eb;border-style:dashed;box-shadow:0 0 0 3px rgba(37,99,235,.18)}
 .node-card.is-group .node-name{font-size:11px;font-weight:800;color:#475569;letter-spacing:.04em;text-transform:uppercase;padding-left:0;margin-top:0}
-.node-card.is-group .drag-handle{color:#94a3b8;opacity:.7}
+.node-card.is-group .drag-handle{
+  position:static;
+  display:block!important;
+  width:100%;
+  text-align:center;
+  font-size:13px;
+  color:#94a3b8;
+  cursor:grab;
+  letter-spacing:3px;
+  margin:-2px 0 4px;
+  line-height:1;
+  opacity:.7;
+  user-select:none;
+}
 /* Group node: horizontal arms stay solid — only the vertical stem DOWN to group's children is dashed */
 ul.grp-children::before{border-left-style:dashed!important;border-color:#94a3b8!important}
 /* Edit panel */
