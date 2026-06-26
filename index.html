@@ -522,18 +522,27 @@ function getAncestorOfRole(nodeId,roleType){
 }
 function getTeamLeaderFor(id){
   const s=getNode(id);if(!s)return null;
-  if(s.roleType==='TEAM_LEADER')return s;
-  // For a TEAM_GROUP walk up through any nested groups to find the first person
+  // TEAM_LEADER: skip up through any groups to find who they report to (their AM/manager)
+  if(s.roleType==='TEAM_LEADER'){
+    let n=s;
+    while(n&&n.parentId){
+      const p=getNode(n.parentId);if(!p)break;
+      if(p.roleType!=='TEAM_GROUP')return p; // first non-group ancestor = direct manager
+      n=p;
+    }
+    return null;
+  }
+  // TEAM_GROUP: skip up through nested groups to find the first person
   if(s.roleType==='TEAM_GROUP'){
     let p=getNode(s.parentId);
     while(p&&p.roleType==='TEAM_GROUP')p=getNode(p.parentId);
     return p||null;
   }
-  // Walk ancestors — if we pass through a TEAM_GROUP, the group's parent is the effective leader
+  // MEMBER/others: walk up and return the first leader encountered (TL, AM, RM, CH)
   let n=getNode(id);
   while(n&&n.parentId){
     const p=getNode(n.parentId);if(!p)break;
-    if(p.roleType==='TEAM_LEADER')return p;
+    if(isLeaderRole(p.roleType))return p;
     if(p.roleType==='TEAM_GROUP'){
       const above=getNode(p.parentId);
       if(above&&isLeaderRole(above.roleType))return above;
@@ -872,8 +881,8 @@ function refreshAncestorInfo(){
   const tl=getTeamLeaderFor(selectedNodeId);
   const asm=getASMFor(selectedNodeId);const rm=getRegMgrFor(selectedNodeId);
   el.innerHTML=`
-    <div class="fg"><label class="fl">Team Leader (auto)</label><input class="fc" readonly value="${fmtPerson(tl)||'—'}"></div>
-    <div class="fg"><label class="fl">ASM (auto)</label><input class="fc" readonly value="${fmtPerson(asm)||'—'}"></div>
+    <div class="fg"><label class="fl">Reports To (auto)</label><input class="fc" readonly value="${fmtPerson(tl)||'—'}"></div>
+    <div class="fg"><label class="fl">Area Manager (auto)</label><input class="fc" readonly value="${fmtPerson(asm)||'—'}"></div>
     <div class="fg"><label class="fl">Regional Manager (auto)</label><input class="fc" readonly value="${fmtPerson(rm)||'—'}"></div>`;
 }
 
