@@ -153,9 +153,12 @@ body.mobile-layout.compact-view .node-name{font-size:12px}
 /* Upward arrow midway on vertical connector — shows "reports to" direction */
 .node-slot::before{content:'';position:absolute;top:-30px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-bottom:8px solid #64748b;z-index:5;pointer-events:none}
 .node-slot.root-slot::before{display:none}
-.node-add-btn{position:absolute;bottom:-14px;left:50%;transform:translateX(-50%);width:28px;height:28px;border-radius:50%;background:#2563eb;color:#fff;border:2px solid #fff;cursor:pointer;font-size:18px;line-height:1;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(37,99,235,.5);z-index:10;transition:.15s;opacity:0;pointer-events:none}
+.node-add-btn{position:absolute;bottom:-14px;left:calc(50% + 16px);transform:translateX(-50%);width:28px;height:28px;border-radius:50%;background:#2563eb;color:#fff;border:2px solid #fff;cursor:pointer;font-size:18px;line-height:1;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(37,99,235,.5);z-index:10;transition:.15s;opacity:0;pointer-events:none}
 .node-slot:hover .node-add-btn{opacity:1;pointer-events:auto}
 .node-add-btn:hover{background:#1d4ed8;transform:translateX(-50%) scale(1.12)}
+.node-addgrp-btn{position:absolute;bottom:-14px;left:calc(50% - 16px);transform:translateX(-50%);width:24px;height:24px;border-radius:50%;background:#7c3aed;color:#fff;border:2px solid #fff;cursor:pointer;font-size:12px;line-height:1;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(124,58,237,.4);z-index:10;transition:.15s;opacity:0;pointer-events:none;title:"Add group"}
+.node-slot:hover .node-addgrp-btn{opacity:1;pointer-events:auto}
+.node-addgrp-btn:hover{background:#6d28d9;transform:translateX(-50%) scale(1.15)}
 .node-shift{position:absolute;top:50%;transform:translateY(-50%);width:22px;height:22px;border-radius:50%;background:#64748b;color:#fff;border:2px solid #fff;cursor:pointer;font-size:11px;line-height:1;display:flex;align-items:center;justify-content:center;z-index:10;opacity:0;pointer-events:none;transition:.15s;box-shadow:0 1px 5px rgba(0,0,0,.25)}
 .node-slot:hover .node-shift{opacity:1;pointer-events:auto}
 .node-shift:hover{background:#374151;transform:translateY(-50%) scale(1.15)}
@@ -312,7 +315,7 @@ body.mobile-layout .modal{width:96vw;max-height:90vh}
 @media print{
   .zoom-controls{display:none!important}
   *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  .hdr,.status-bar,.filter-bar,.edit-panel,.node-add-btn,.node-shift,.drop-root-zone,.warn-banner,.toast-container,.overlay{display:none!important}
+  .hdr,.status-bar,.filter-bar,.edit-panel,.node-add-btn,.node-addgrp-btn,.node-shift,.drop-root-zone,.warn-banner,.toast-container,.overlay{display:none!important}
   body,html{overflow:visible!important;height:auto!important;background:#fff!important}
   .main{display:block!important;overflow:visible!important;height:auto!important}
   .tree-panel{overflow:visible!important;height:auto!important;padding:20px!important;cursor:default!important}
@@ -681,6 +684,15 @@ function fmtDate(d){if(!d)return'';const[y,m,dy]=d.split('-');return`${dy}/${m}/
 function todayStr(){return new Date().toISOString().slice(0,10);}
 function addRootNode(){openModal(null);}
 function addChildNode(parentId){if(!parentId)return;openModal(parentId);}
+function addGroupNode(parentId){
+  const parent=parentId?getNode(parentId):null;
+  const node=makeNode(parentId);
+  node.roleType='TEAM_GROUP';
+  node.teamName=(parent&&parent.teamName?parent.teamName+' Sub':'New Group');
+  node.assignedProvinces=parent?parent.assignedProvinces||'':'';
+  orgNodes.push(node);logAudit('ADD',node);saveState();selectedNodeId=node.id;render();
+  selectNode(node.id);toast('Group added — set the name and save ✓','success');
+}
 function insertNode(node){
   orgNodes.push(node);logAudit('ADD',node);saveState();selectedNodeId=node.id;render();
   const label=node.roleType==='TEAM_GROUP'?('📁 '+(node.teamName||'Team Group')):(node.firstName||node.email||'Person');
@@ -1157,7 +1169,7 @@ window.addEventListener('resize',()=>document.querySelectorAll('.ac-list.open').
 (()=>{
   const panel=document.getElementById('treePanel');
   let panning=false,startX=0,startY=0,scrollX=0,scrollY=0,moved=false;
-  const IGNORE='.node-card,.node-add-btn,.node-badge,.btn,.filter-bar,.warn-banner,.drop-root-zone,.overlay';
+  const IGNORE='.node-card,.node-add-btn,.node-addgrp-btn,.node-badge,.btn,.filter-bar,.warn-banner,.drop-root-zone,.overlay';
   panel.addEventListener('mousedown',e=>{
     if(e.button!==0||e.target.closest(IGNORE))return;
     panning=true;moved=false;
@@ -1286,6 +1298,7 @@ function renderTreeNode(nodeId,visibleIds,matchIds){
         ${provs.length?`<div class="node-provs" style="text-align:center;padding-left:0;margin-top:4px">${provs.join(' · ')}</div>`:''}
       </div>
       <button class="node-shift node-shift-r" onclick="event.stopPropagation();shiftNode('${nodeId}',1)" title="Move right">▶</button>
+      <button class="node-addgrp-btn" onclick="event.stopPropagation();addGroupNode('${nodeId}')" title="Add team group">📁</button>
       <button class="node-add-btn" onclick="event.stopPropagation();addChildNode('${nodeId}')" title="Add member">+</button>
       </div>
       ${childrenHTML}
@@ -1319,13 +1332,14 @@ function renderTreeNode(nodeId,visibleIds,matchIds){
       ${node.email?`<div class="node-email">${node.email}</div>`:`<div class="node-no-email">⚠ no email set</div>`}
       ${lv?`<div class="node-leave" style="color:${lv.c}">${lv.e} ${node.leaveType}${node.leaveStart?' · '+fmtDate(node.leaveStart):''}</div>`:''}
       ${node.teamName?`<div class="node-team">${node.teamName}</div>`:''}
-      ${memberOfGrp&&memberOfGrp!==node.teamName?`<div class="node-member-of">📂 ${memberOfGrp}</div>`:''}
+      ${memberOfGrp&&(node.roleType==='MEMBER'||memberOfGrp!==node.teamName)?`<div class="node-member-of">📂 ${memberOfGrp}</div>`:''}
       ${extras.length?`<div class="node-extra-teams">▲ Also: ${extras.join(' · ')}</div>`:''}
       ${node.assistingNote?`<div class="node-assist">↗ ${node.assistingNote}</div>`:''}
       ${provs.length?`<div class="node-provs">${provs.join(' · ')}</div>`:''}
       ${hiddenCount>0?`<div style="font-size:9px;color:#94a3b8;margin-top:3px;padding-left:10px">+${hiddenCount} hidden by filter</div>`:''}
     </div>
     <button class="node-shift node-shift-r" onclick="event.stopPropagation();shiftNode('${nodeId}',1)" title="Move right">▶</button>
+    <button class="node-addgrp-btn" onclick="event.stopPropagation();addGroupNode('${nodeId}')" title="Add team group">📁</button>
     <button class="node-add-btn" onclick="event.stopPropagation();addChildNode('${nodeId}')" title="Add subordinate">+</button>
     </div>
     ${childrenHTML}
