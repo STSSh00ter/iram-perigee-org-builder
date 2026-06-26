@@ -675,6 +675,7 @@ function makeNode(parentId=null){
     teamName:'',assignedProvinces:'',extraTeams:[],assistingNote:'',memberOfTeam:'',notInPerigee:false,
     leaveType:'',leaveStart:'',leaveEnd:'',resigned:false,resignedDate:''};
 }
+// Members: stop at TEAM_GROUP or any leader role (universal chip)
 function getParentGroupName(id){
   let n=getNode(id);
   while(n&&n.parentId){
@@ -683,6 +684,31 @@ function getParentGroupName(id){
     if(isLeaderRole(n.roleType)&&n.teamName)return n.teamName;
   }
   return null;
+}
+// Team Leaders: only show chip when literally inside a TEAM_GROUP node (not just under any leader)
+function getParentGroupOnly(id){
+  let n=getNode(id);
+  while(n&&n.parentId){
+    n=getNode(n.parentId);if(!n)break;
+    if(n.roleType==='TEAM_GROUP')return n.teamName||null;
+    if(isLeaderRole(n.roleType))return null;
+  }
+  return null;
+}
+// Batch-fix: walk every MEMBER node and derive teamName from current parent chain
+function recalcMemberTeams(){
+  let changed=0;
+  orgNodes.forEach(node=>{
+    if(node.roleType!=='MEMBER')return;
+    let derived='';let pid=node.parentId;
+    while(pid){const p=getNode(pid);if(!p)break;
+      if(p.roleType==='TEAM_GROUP'&&p.teamName){derived=p.teamName;break;}
+      if(isLeaderRole(p.roleType)&&p.teamName){derived=p.teamName;break;}
+      pid=p.parentId;}
+    if(derived&&derived!==node.teamName){node.teamName=derived;changed++;}
+  });
+  return changed;
+}
 }
 function fmtDate(d){if(!d)return'';const[y,m,dy]=d.split('-');return`${dy}/${m}/${y}`;}
 function todayStr(){return new Date().toISOString().slice(0,10);}
@@ -1305,7 +1331,8 @@ function renderTreeNode(nodeId,visibleIds,matchIds){
   const dispName=node.firstName?(node.firstName+(node.lastName?' '+node.lastName:'')):(node.email||'(unnamed)');
   const provs=getNodeProvinces(node);const extras=node.extraTeams||[];
   const lv=node.leaveType?getLeaveVisual(node.leaveType):null;
-  const memberOfGrp=getParentGroupName(nodeId)||(node.memberOfTeam||null);
+  // MEMBER: chip from any ancestor (group or leader); TL: only if inside a TEAM_GROUP; others: never
+  const memberOfGrp=node.roleType==='MEMBER'?getParentGroupName(nodeId):node.roleType==='TEAM_LEADER'?getParentGroupOnly(nodeId):null;
   const hiddenCount=allCh.length-visibleCh.length;
   let childrenHTML='';
   if(visibleCh.length)childrenHTML=`<ul>${visibleCh.map(c=>liWrap(c.id,visibleIds,matchIds)).join('')}</ul>`;
@@ -1327,7 +1354,7 @@ function renderTreeNode(nodeId,visibleIds,matchIds){
       ${node.email?`<div class="node-email">${node.email}</div>`:`<div class="node-no-email">⚠ no email set</div>`}
       ${lv?`<div class="node-leave" style="color:${lv.c}">${lv.e} ${node.leaveType}${node.leaveStart?' · '+fmtDate(node.leaveStart):''}</div>`:''}
       ${node.teamName?`<div class="node-team">${node.teamName}</div>`:''}
-      ${memberOfGrp&&(node.roleType==='MEMBER'||memberOfGrp!==node.teamName)?`<div class="node-member-of">📂 ${memberOfGrp}</div>`:''}
+      ${memberOfGrp?`<div class="node-member-of">📂 ${memberOfGrp}</div>`:''}
       ${extras.length?`<div class="node-extra-teams">▲ Also: ${extras.join(' · ')}</div>`:''}
       ${node.assistingNote?`<div class="node-assist">↗ ${node.assistingNote}</div>`:''}
       ${provs.length?`<div class="node-provs">${provs.join(' · ')}</div>`:''}
@@ -1861,7 +1888,9 @@ async function loadFromCloud(){
     if(error||!data||!data.nodes)return false;
     orgNodes=data.nodes;
     if(perigeeUsers.length)orgNodes.forEach(n=>{n.notInPerigee=!!n.email&&!findPerigeeUser(n.email);});
+    const recalcChanged=recalcMemberTeams();
     try{localStorage.setItem('iram-org-v5',JSON.stringify(orgNodes));}catch(e){}
+    if(recalcChanged>0)syncToCloud();
     setSyncStatus('☁ synced '+new Date().toLocaleTimeString(),'#059669');
     return true;
   }catch(e){setSyncStatus('☁ load failed','#dc2626');return false;}
@@ -2033,6 +2062,7 @@ loadState();
 detectLayout();
 document.body.classList.toggle('compact-view',compactView);
 if(orgNodes.length===0){orgNodes=getInitialOrg();saveState();}
+recalcMemberTeams();
 render();
 if(initSupabase()){
   Promise.all([loadFromCloud(),loadPerigeeFromCloud()]).then(([treeOk,perigeeOk])=>{
