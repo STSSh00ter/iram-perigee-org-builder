@@ -437,7 +437,7 @@ const ROLE_TYPES=[
   {v:'AREA_MANAGER',label:'Area Manager',color:'role-area',badge:'Area Manager'},
   {v:'TEAM_LEADER',label:'Team Leader',color:'role-tl',badge:'Team Leader'},
   {v:'MEMBER',label:'Team Member',color:'role-mem',badge:'Member'},
-  {v:'TEAM_GROUP',label:'── Team Group (visual divider)',color:'role-grp',badge:'Team Group'},
+  {v:'TEAM_GROUP',label:'Team Group',color:'role-grp',badge:'Team Group'},
 ];
 const LEADER_ROLES=['REGIONAL_MANAGER','CHANNEL_HEAD','AREA_MANAGER','TEAM_LEADER'];
 const JOB_TITLES=['Brand Ambassador','General Merchandiser','Roaming Merchandiser','Field Agent','Representative','RVL Rep','Team Leader','Area Manager','Channel Manager','Key Account Manager','Operations Manager','Regional Manager','Channel Head','CRM Manager','Ops Lead','Learner','Promoter','Vacant'];
@@ -867,29 +867,24 @@ function collectFormInto(node,pfx){
   node.firstName=(document.getElementById(pfx+'firstName').value||'').trim();
   node.lastName=(document.getElementById(pfx+'lastName').value||'').trim();
   node.jobTitle=document.getElementById(pfx+'jobTitle').value;
-  node.teamName=(document.getElementById(pfx+'teamName').value||'').trim();
   node.assignedProvinces=PROVINCES.filter(p=>{const cb=document.getElementById(pfx+'prov_'+p);return cb&&cb.checked;}).join(',');
-  // Extra teams only for leader roles; clear for MEMBER
   if(isLeaderRole(node.roleType)){
+    node.teamName=(document.getElementById(pfx+'teamName')?.value||'').trim();
     const et=document.getElementById(pfx+'extraTeams');
     node.extraTeams=et?Array.from(et.selectedOptions).map(o=>o.value):[];
     node.assistingNote='';
   } else {
+    // MEMBER: team is auto-derived from parent hierarchy
     node.extraTeams=[];
-    node.assistingNote=(document.getElementById(pfx+'assistingNote').value||'').trim();
-    if(node.extraTeams.length>0){
-      toast('Members can only belong to one team — extra team assignments cleared.','warn');
-      node.extraTeams=[];
-    }
-  }
-  // If parent is a TEAM_GROUP and teamName is blank, inherit the group's name
-  if(!node.teamName&&node.parentId){
-    const par=getNode(node.parentId);
-    if(par&&par.roleType==='TEAM_GROUP'&&par.teamName)node.teamName=par.teamName;
+    node.assistingNote=(document.getElementById(pfx+'assistingNote')?.value||'').trim();
+    let derived='';let pid=node.parentId;
+    while(pid){const p=getNode(pid);if(!p)break;
+      if(p.roleType==='TEAM_GROUP'&&p.teamName){derived=p.teamName;break;}
+      if(isLeaderRole(p.roleType)&&p.teamName){derived=p.teamName;break;}
+      pid=p.parentId;}
+    if(derived)node.teamName=derived;
   }
   node.notInPerigee=perigeeUsers.length>0&&!!node.email&&!findPerigeeUser(node.email);
-  const motEl=document.getElementById(pfx+'memberOfTeam');
-  if(motEl)node.memberOfTeam=motEl.value;
   // Leave fields
   node.leaveType=(document.getElementById(pfx+'leaveType')?.value||'');
   node.leaveStart=(document.getElementById(pfx+'leaveStart')?.value||'');
@@ -907,11 +902,16 @@ function onRoleChange(pfx){
   const role=document.getElementById(pfx+'roleType').value;
   const isLeader=isLeaderRole(role);
   const isGroup=role==='TEAM_GROUP';
+  const isMember=role==='MEMBER';
+  const ts=document.getElementById(pfx+'teamNameSection');
   const es=document.getElementById(pfx+'extraTeamsSection');
   const ns=document.getElementById(pfx+'assistNoteSection');
   const ids=document.getElementById(pfx+'identitySection');
   const ls=document.getElementById(pfx+'leaveSection');
   const rs=document.getElementById(pfx+'resignedSection');
+  const lbl=ts?ts.querySelector('label.fl'):null;
+  if(ts)ts.style.display=isMember?'none':'';
+  if(lbl)lbl.textContent=isGroup?'Group Name *':isLeader?'Leader of Team':'Team Name';
   if(es)es.style.display=(isLeader&&!isGroup)?'':'none';
   if(ns)ns.style.display=(isLeader||isGroup)?'none':'';
   if(ids)ids.style.display=isGroup?'none':'';
@@ -935,10 +935,7 @@ function buildFormHTML(node,pfx){
   const teams=allTeamNames();
   const isLeader=isLeaderRole(node.roleType);
   const isGroup=node.roleType==='TEAM_GROUP';
-  const parentNode=node.parentId?getNode(node.parentId):null;
-  const hasGroupParent=!!(parentNode&&parentNode.roleType==='TEAM_GROUP');
-  const groupTeams=[...new Set(orgNodes.filter(n=>n.roleType==='TEAM_GROUP').map(n=>n.teamName).filter(Boolean))].sort();
-  const memberOfOpts=groupTeams.map(t=>`<option value="${t}"${node.memberOfTeam===t?' selected':''}>${t}</option>`).join('');
+  const isMember=node.roleType==='MEMBER';
   const provChips=PROVINCES.map(p=>`
     <label class="prov-chip">
       <input type="checkbox" id="${pfx}prov_${p}" value="${p}" ${nodeProv.includes(p)?'checked':''}>
@@ -956,16 +953,10 @@ function buildFormHTML(node,pfx){
     <div class="fg"><label class="fl">Role Type *</label>
       <select id="${pfx}roleType" class="fc" onchange="onRoleChange('${pfx}')">${roleOpts}</select>
     </div>
-    <div class="fg"><label class="fl">Team Name ${isGroup?'*':''}</label>
-      <input id="${pfx}teamName" class="fc" placeholder="e.g. Team KZN Outlying" value="${node.teamName}" list="${pfx}teamList">
-      <datalist id="${pfx}teamList">${teams.map(t=>`<option value="${t}">`).join('')}</datalist>
-    </div>
-    <div id="${pfx}memberOfSection" style="display:${(!isGroup&&!hasGroupParent)?'':'none'}">
-      <div class="fg"><label class="fl">Member of Group <span style="font-weight:400;text-transform:none;font-size:10px">(auto if under a group node)</span></label>
-        <select id="${pfx}memberOfTeam" class="fc">
-          <option value="">— None —</option>
-          ${memberOfOpts}
-        </select>
+    <div id="${pfx}teamNameSection" style="display:${isMember?'none':''}">
+      <div class="fg"><label class="fl">${isGroup?'Group Name *':isLeader?'Leader of Team':'Team Name'}</label>
+        <input id="${pfx}teamName" class="fc" placeholder="${isGroup?'e.g. Team KZN Outlying':'e.g. Team KZN 1'}" value="${node.teamName}" list="${pfx}teamList">
+        <datalist id="${pfx}teamList">${teams.map(t=>`<option value="${t}">`).join('')}</datalist>
       </div>
     </div>
     <div class="fg">
