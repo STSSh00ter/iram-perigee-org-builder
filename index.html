@@ -9,11 +9,21 @@
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Segoe UI',Arial,sans-serif;background:#eef2f7;color:#1e293b;height:100vh;overflow:hidden;display:flex;flex-direction:column}
-.hdr{background:#102742;color:#fff;padding:0 20px;height:52px;display:flex;align-items:center;gap:12px;flex-shrink:0;box-shadow:0 2px 10px rgba(0,0,0,.35)}
-.hdr-logo{font-size:20px;font-weight:900;letter-spacing:-.5px;color:#f97316}
-.hdr-title{font-size:15px;font-weight:700;flex:1}
+.hdr{background:#102742;color:#fff;padding:0 12px;min-height:52px;height:auto;display:flex;align-items:center;gap:8px;flex-shrink:0;box-shadow:0 2px 10px rgba(0,0,0,.35);flex-wrap:wrap;overflow:visible}
+.hdr-logo{font-size:20px;font-weight:900;letter-spacing:-.5px;color:#f97316;flex-shrink:0}
+.hdr-title{font-size:15px;font-weight:700}
 .hdr-sub{font-size:11px;opacity:.6;margin-top:1px}
-.hdr-actions{display:flex;gap:8px;align-items:center}
+.hdr-brand{flex-shrink:0}
+.hdr-actions{display:flex;gap:6px;align-items:center;overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;scrollbar-width:none;flex:1;min-width:0;padding:4px 0}
+.hdr-actions::-webkit-scrollbar{display:none}
+.find-wrap{display:flex;align-items:center;gap:6px;background:#f1f5f9;border:1.5px solid #e2e8f0;border-radius:6px;padding:4px 8px;min-width:140px;max-width:220px;transition:.15s}
+.find-wrap.active{border-color:#2563eb;background:#eff6ff}
+.find-wrap input{border:none;background:transparent;outline:none;font-size:11px;color:#1e293b;width:100%;font-family:inherit}
+.find-wrap input::placeholder{color:#94a3b8}
+.find-clear{cursor:pointer;color:#94a3b8;font-size:14px;flex-shrink:0;line-height:1;padding:0 2px;display:none}
+.find-clear.show{display:block}
+.find-clear:hover{color:#475569}
+.node-card.find-match{outline:2px solid #2563eb;outline-offset:2px}
 .status-bar{background:#1e293b;color:#64748b;padding:3px 16px;font-size:11px;display:flex;gap:18px;flex-shrink:0}
 .status-bar b{color:#94a3b8}
 .btn{padding:7px 14px;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;transition:.15s;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
@@ -334,9 +344,12 @@ body.mobile-layout .modal{width:96vw;max-height:90vh}
 </head>
 <body>
 <div class="hdr">
-  <div class="hdr-logo">iRam</div>
-  <div><div class="hdr-title">Perigee Org Builder</div><div class="hdr-sub">Build your reporting tree &amp; export to Perigee</div></div>
+  <div class="hdr-brand" style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+    <div class="hdr-logo">iRam</div>
+    <div><div class="hdr-title">Perigee Org Builder</div><div class="hdr-sub">Build your reporting tree &amp; export to Perigee</div></div>
+  </div>
   <div class="hdr-actions">
+    <button class="btn btn-ghost btn-sm" id="btnUndo" onclick="undo()" disabled title="Undo last change (Ctrl+Z)">↩ Undo</button>
     <button class="btn btn-ghost btn-mob-hide" onclick="loadPerigeeFile()">📂 Load Perigee Users</button>
     <button class="btn btn-ghost btn-mob-hide" onclick="addRootNode()">＋ Add Root Person</button>
     <button class="btn btn-ghost btn-sm btn-mob-hide" onclick="exportState()" title="Export tree for sharing with others">📤 Export Tree</button>
@@ -447,7 +460,8 @@ const JOB_TITLES=['Brand Ambassador','General Merchandiser','Roaming Merchandise
 const PROVINCES=['EC','FS','GP','KZN','LP','MP','NC','NW','WC'];
 const KNOWN_TEAMS=['BLUE POWER','Bosch Automotive','MM Chanel Head+Ops','Team Coastal','Team EC 1','Team EC 2','Team EC 3','Team Free State','Team GP MT','Team GP TT PTA','Team Highveld (MP)','Team Inland','Team KZN 1','Team KZN 2','Team KZN 3','Team KZN 4','Team Limpopo','Team Lowveld (MP)','Team Massbuild JHB','Team MT GP Centurion/Midrand','Team MT GP East/Central','Team MT GP North/West','Team MT GP NW (Potch)','Team MT GP PTA','Team MT GP South Vaal','Team Northen Cape','Team NW RustenB','Team Ops Heads','Team Ops Massbuild','Team RVL','Team WC 1','Team WC 2','Team WC 3','Team WC 4','Team WC 5','Team WC 6'];
 
-let perigeeUsers=[],orgNodes=[],selectedNodeId=null,pendingParentId=null,draggedNodeId=null,filterProvince='',filterTeamName='';
+let perigeeUsers=[],orgNodes=[],selectedNodeId=null,pendingParentId=null,draggedNodeId=null,filterProvince='',filterTeamName='',findQuery='';
+let undoStack=[];
 // Mobile layout is auto-detected from the screen's aspect ratio + size (re-checked on rotate)
 function isMobileAspect(){
   const w=window.innerWidth,h=window.innerHeight;
@@ -472,9 +486,24 @@ function toggleCompact(){
   renderFilterBar();
 }
 
-function saveState(){
+function pushUndo(){
+  undoStack.push(JSON.stringify(orgNodes));
+  if(undoStack.length>40)undoStack.shift();
+  const btn=document.getElementById('btnUndo');
+  if(btn)btn.disabled=false;
+}
+function undo(){
+  if(!undoStack.length)return;
+  orgNodes=JSON.parse(undoStack.pop());
   try{localStorage.setItem('iram-org-v5',JSON.stringify(orgNodes));}catch(e){}
-  syncToCloud(); // fire-and-forget; no-op if not configured
+  const btn=document.getElementById('btnUndo');
+  if(btn)btn.disabled=!undoStack.length;
+  render();
+}
+function saveState(){
+  pushUndo();
+  try{localStorage.setItem('iram-org-v5',JSON.stringify(orgNodes));}catch(e){}
+  syncToCloud();
 }
 function loadState(){
   try{
@@ -643,9 +672,17 @@ function isTeamMatch(n){
   if(!filterTeamName)return true;
   return n.teamName===filterTeamName||(n.extraTeams||[]).includes(filterTeamName);
 }
+function isFindMatch(n){
+  if(!findQuery)return true;
+  const q=findQuery.toLowerCase();
+  const full=((n.firstName||'')+' '+(n.lastName||'')).toLowerCase();
+  return full.includes(q)||(n.email||'').toLowerCase().includes(q)||
+    (n.teamName||'').toLowerCase().includes(q)||(n.jobTitle||'').toLowerCase().includes(q)||
+    ((n.extraTeams||[]).join(' ')).toLowerCase().includes(q);
+}
 function computeVisibleIds(){
-  if(!filterProvince&&!filterTeamName)return null;
-  const directMatches=orgNodes.filter(n=>isProvMatch(n)&&isTeamMatch(n));
+  if(!filterProvince&&!filterTeamName&&!findQuery)return null;
+  const directMatches=orgNodes.filter(n=>isProvMatch(n)&&isTeamMatch(n)&&isFindMatch(n));
   const visible=new Set();
   directMatches.forEach(n=>{
     visible.add(n.id);allDescendants(n.id).forEach(d=>visible.add(d.id));
@@ -654,6 +691,19 @@ function computeVisibleIds(){
   return visible;
 }
 function setFilter(prov,team){filterProvince=prov;filterTeamName=team;render();}
+function setFind(q){
+  findQuery=q;
+  const fw=document.querySelector('.find-wrap');
+  const fc=document.querySelector('.find-clear');
+  if(fw)fw.classList.toggle('active',!!q);
+  if(fc)fc.classList.toggle('show',!!q);
+  // auto-select if exactly one match
+  if(q){
+    const hits=orgNodes.filter(isFindMatch);
+    if(hits.length===1)selectedNodeId=hits[0].id;
+  }
+  render();
+}
 // Per-leave-type emoji + animation + accent colour
 function getLeaveVisual(t){
   const m={
@@ -677,7 +727,7 @@ function renderFilterBar(){
   document.getElementById('filterBar').innerHTML=`
     <div class="filter-bar">
       <span class="filter-label">View:</span>
-      <button class="filter-pill ${!active?'active':''}" onclick="setFilter('','')">All (${orgNodes.length})</button>
+      <button class="filter-pill ${!active&&!findQuery?'active':''}" onclick="setFilter('','');setFind('')">All (${orgNodes.length})</button>
       <button class="filter-pill ${compactView?'active':''}" onclick="toggleCompact()" title="Compact cards — show name & role only">${compactView?'▣':'▢'} Compact</button>
       ${provs.map(p=>`<button class="filter-pill prov ${filterProvince===p&&!filterTeamName?'active':''}" onclick="setFilter('${p}','')">${p}</button>`).join('')}
       ${teams.length?`<span class="filter-sep">|</span>
@@ -685,7 +735,15 @@ function renderFilterBar(){
           <option value="">Team…</option>
           ${teams.map(t=>`<option value="${t}" ${filterTeamName===t?'selected':''}>${t}</option>`).join('')}
         </select>`:''}
-      ${active?`<span class="filter-count">Showing <b>${visIds?visIds.size:orgNodes.length}</b> of ${orgNodes.length} nodes</span>`:''}
+      ${active||findQuery?`<span class="filter-count">Showing <b>${visIds?visIds.size:orgNodes.length}</b> of ${orgNodes.length} nodes</span>`:''}
+      <div class="find-wrap${findQuery?' active':''}" style="margin-left:auto">
+        <span style="font-size:12px;color:#94a3b8;flex-shrink:0">🔍</span>
+        <input type="text" placeholder="Find by name, email, team…" value="${findQuery.replace(/"/g,'&quot;')}"
+          oninput="setFind(this.value)"
+          onkeydown="if(event.key==='Escape'){setFind('');this.value='';}"
+          id="findInput">
+        <span class="find-clear${findQuery?' show':''}" onclick="setFind('');document.getElementById('findInput').value=''">✕</span>
+      </div>
     </div>`;
 }
 
@@ -1580,8 +1638,9 @@ function toggleEditPanel(){
 }
 
 document.addEventListener('keydown',e=>{
-  if(e.key==='Escape'){closeModal();closeDelModal();closeAdmin();}
+  if(e.key==='Escape'){closeModal();closeDelModal();closeAdmin();setFind('');const fi=document.getElementById('findInput');if(fi)fi.value='';}
   if(e.key==='Delete'&&selectedNodeId&&document.activeElement.tagName==='BODY')deleteNode(selectedNodeId);
+  if((e.ctrlKey||e.metaKey)&&e.key==='z'&&document.activeElement.tagName==='BODY'){e.preventDefault();undo();}
 });
 
 // ─── DEVICE ID ──────────────────────────────────────────────────────────────
