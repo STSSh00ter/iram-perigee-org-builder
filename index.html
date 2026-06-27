@@ -1571,29 +1571,23 @@ function exportExcel(){
       'CYCLE STATUS':'ACTIVE','CYCLE':4,'CYCLE START DATE':'','CYCLE END DATE':'',
     };
     rows.push(baseRow);
-    if(isSeniorLeader){
-      // AM/CH: auto-collect every TEAM_GROUP under them + their own teamName as managed team rows
-      const autoGroups=getManagedGroupTeams(node.id);
-      const managedTeams=[...new Set([node.teamName,...autoGroups,(node.extraTeams||[])])].filter(t=>t&&t!==exportTeamName);
-      managedTeams.forEach(mt=>{
-        rows.push({...baseRow,'TEAM NAME':mt,'TEAM LEADER':fmtPerson(node)});
+    if(node.roleType==='TEAM_LEADER'){
+      // Auto-row for the immediate parent TEAM_GROUP (e.g. Sinalo → Team EC East London + Team EC 1)
+      const parentGrp=getNode(node.parentId);
+      if(parentGrp&&parentGrp.roleType==='TEAM_GROUP'&&parentGrp.teamName&&parentGrp.teamName!==node.teamName)
+        rows.push({...baseRow,'TEAM NAME':parentGrp.teamName});
+      // Manual extra teams
+      (node.extraTeams||[]).forEach(extraTeam=>{
+        rows.push({...baseRow,'TEAM NAME':extraTeam});
       });
-    } else {
-      // TL/MEMBER: extra rows from extraTeams (additional team memberships)
+    } else if(!isSeniorLeader){
+      // MEMBER extra teams
       (node.extraTeams||[]).forEach(extraTeam=>{
         const etl=getTeamLeaderForExport(node.id,extraTeam);
-        rows.push({...baseRow,'TEAM NAME':extraTeam,
-          'TEAM LEADER':node.roleType==='TEAM_LEADER'?fmtPerson(node):fmtPerson(etl)});
+        rows.push({...baseRow,'TEAM NAME':extraTeam,'TEAM LEADER':fmtPerson(etl)});
       });
     }
-  });
-  // Drop rows where the user is also their own team leader — redundant, captured elsewhere
-  const allRows=rows.splice(0);
-  allRows.forEach(r=>{
-    const ue=(r['USER EMAIL']||'').toLowerCase().trim();
-    const tlm=(r['TEAM LEADER']||'').match(/\(([^)]+)\)/);
-    const tle=tlm?tlm[1].toLowerCase().trim():(r['TEAM LEADER']||'').toLowerCase().trim();
-    if(!ue||!tle||ue!==tle)rows.push(r);
+    // AM/CH: membership row only — their managed teams surface through TL rows above
   });
   const wb=XLSX.utils.book_new();
   const cw=[{wch:10},{wch:34},{wch:16},{wch:16},{wch:18},{wch:14},{wch:22},{wch:10},{wch:14},{wch:12},{wch:14},{wch:12},{wch:28},{wch:38},{wch:38},{wch:38},{wch:28},{wch:14},{wch:8},{wch:16},{wch:14}];
