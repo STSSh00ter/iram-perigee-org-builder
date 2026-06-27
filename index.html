@@ -1572,10 +1572,12 @@ function exportExcel(){
     };
     rows.push(baseRow);
     if(node.roleType==='TEAM_LEADER'){
-      // Auto-row for the immediate parent TEAM_GROUP (e.g. Sinalo → Team EC East London + Team EC 1)
+      // Auto-row for the immediate parent TEAM_GROUP; TL = the person who owns the group (e.g. Sibusiso for Team EC 1)
       const parentGrp=getNode(node.parentId);
-      if(parentGrp&&parentGrp.roleType==='TEAM_GROUP'&&parentGrp.teamName&&parentGrp.teamName!==node.teamName)
-        rows.push({...baseRow,'TEAM NAME':parentGrp.teamName});
+      if(parentGrp&&parentGrp.roleType==='TEAM_GROUP'&&parentGrp.teamName&&parentGrp.teamName!==node.teamName){
+        const grpLeader=getTeamLeaderFor(parentGrp.id);
+        rows.push({...baseRow,'TEAM NAME':parentGrp.teamName,'TEAM LEADER':fmtPerson(grpLeader||node)});
+      }
       // Manual extra teams
       (node.extraTeams||[]).forEach(extraTeam=>{
         rows.push({...baseRow,'TEAM NAME':extraTeam});
