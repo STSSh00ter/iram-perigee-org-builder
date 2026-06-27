@@ -612,6 +612,12 @@ function getTeamLeaderForExport(nodeId, teamName){
 }
 
 function allDescendants(nodeId){const r=[],q=[nodeId];while(q.length){const id=q.shift();getChildren(id).forEach(c=>{r.push(c);q.push(c.id);});}return r;}
+// Walk subtree of nodeId, collect teamNames of TEAM_GROUP nodes — stop recursing into person nodes
+function getManagedGroupTeams(nodeId){
+  const teams=[];
+  function walk(id){getChildren(id).forEach(c=>{if(c.roleType==='TEAM_GROUP'){if(c.teamName)teams.push(c.teamName);walk(c.id);}});}
+  walk(nodeId);return teams;
+}
 function isDescendant(possibleDescId,ancestorId){return allDescendants(ancestorId).some(n=>n.id===possibleDescId);}
 function allTeamNames(){const s=new Set(KNOWN_TEAMS);orgNodes.forEach(n=>{if(n.teamName)s.add(n.teamName);(n.extraTeams||[]).forEach(t=>s.add(t));});return[...s].sort();}
 function nipCount(){return orgNodes.filter(n=>n.notInPerigee).length;}
@@ -1566,11 +1572,11 @@ function exportExcel(){
     };
     rows.push(baseRow);
     if(isSeniorLeader){
-      // AM/CH: also emit a row for each team they MANAGE (own teamName + extraTeams), as their leader
-      if(node.teamName&&node.teamName!==exportTeamName)
-        rows.push({...baseRow,'TEAM NAME':node.teamName,'TEAM LEADER':fmtPerson(node)});
-      (node.extraTeams||[]).forEach(extraTeam=>{
-        rows.push({...baseRow,'TEAM NAME':extraTeam,'TEAM LEADER':fmtPerson(node)});
+      // AM/CH: auto-collect every TEAM_GROUP under them + their own teamName as managed team rows
+      const autoGroups=getManagedGroupTeams(node.id);
+      const managedTeams=[...new Set([node.teamName,...autoGroups,(node.extraTeams||[])])].filter(t=>t&&t!==exportTeamName);
+      managedTeams.forEach(mt=>{
+        rows.push({...baseRow,'TEAM NAME':mt,'TEAM LEADER':fmtPerson(node)});
       });
     } else {
       // TL/MEMBER: extra rows from extraTeams (additional team memberships)
