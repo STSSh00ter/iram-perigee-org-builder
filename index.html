@@ -1565,12 +1565,21 @@ function exportExcel(){
       'CYCLE STATUS':'ACTIVE','CYCLE':4,'CYCLE START DATE':'','CYCLE END DATE':'',
     };
     rows.push(baseRow);
-    // Extra team rows — TEAM_LEADER only; AM+ extraTeams = teams they manage, not membership rows
-    if(!isSeniorLeader)(node.extraTeams||[]).forEach(extraTeam=>{
-      const etl=getTeamLeaderForExport(node.id,extraTeam);
-      rows.push({...baseRow,'TEAM NAME':extraTeam,
-        'TEAM LEADER':node.roleType==='TEAM_LEADER'?fmtPerson(node):fmtPerson(etl)});
-    });
+    if(isSeniorLeader){
+      // AM/CH: also emit a row for each team they MANAGE (own teamName + extraTeams), as their leader
+      if(node.teamName&&node.teamName!==exportTeamName)
+        rows.push({...baseRow,'TEAM NAME':node.teamName,'TEAM LEADER':fmtPerson(node)});
+      (node.extraTeams||[]).forEach(extraTeam=>{
+        rows.push({...baseRow,'TEAM NAME':extraTeam,'TEAM LEADER':fmtPerson(node)});
+      });
+    } else {
+      // TL/MEMBER: extra rows from extraTeams (additional team memberships)
+      (node.extraTeams||[]).forEach(extraTeam=>{
+        const etl=getTeamLeaderForExport(node.id,extraTeam);
+        rows.push({...baseRow,'TEAM NAME':extraTeam,
+          'TEAM LEADER':node.roleType==='TEAM_LEADER'?fmtPerson(node):fmtPerson(etl)});
+      });
+    }
   });
   const wb=XLSX.utils.book_new();
   const cw=[{wch:10},{wch:34},{wch:16},{wch:16},{wch:18},{wch:14},{wch:22},{wch:10},{wch:14},{wch:12},{wch:14},{wch:12},{wch:28},{wch:38},{wch:38},{wch:38},{wch:28},{wch:14},{wch:8},{wch:16},{wch:14}];
