@@ -1587,6 +1587,14 @@ function exportExcel(){
       });
     }
   });
+  // Drop rows where the user is also their own team leader — redundant, captured elsewhere
+  const allRows=rows.splice(0);
+  allRows.forEach(r=>{
+    const ue=(r['USER EMAIL']||'').toLowerCase().trim();
+    const tlm=(r['TEAM LEADER']||'').match(/\(([^)]+)\)/);
+    const tle=tlm?tlm[1].toLowerCase().trim():(r['TEAM LEADER']||'').toLowerCase().trim();
+    if(!ue||!tle||ue!==tle)rows.push(r);
+  });
   const wb=XLSX.utils.book_new();
   const cw=[{wch:10},{wch:34},{wch:16},{wch:16},{wch:18},{wch:14},{wch:22},{wch:10},{wch:14},{wch:12},{wch:14},{wch:12},{wch:28},{wch:38},{wch:38},{wch:38},{wch:28},{wch:14},{wch:8},{wch:16},{wch:14}];
   const perigeeRows=rows.filter(r=>r.STATUS!=='NOT IN PERIGEE');
