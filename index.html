@@ -1538,8 +1538,14 @@ function exportExcel(){
     if(node.roleType==='TEAM_GROUP')return; // structural node — not a person
     const asm=getASMFor(node.id),rm=getRegMgrFor(node.id);
     const pu=findPerigeeUser(node.email);
-    // Primary team row
-    const tl=getTeamLeaderForExport(node.id,node.teamName);
+    // AM/CH roles belong to their MANAGER's team, not their own managed team
+    const isSeniorLeader=node.roleType==='AREA_MANAGER'||node.roleType==='CHANNEL_HEAD';
+    let exportTeamName=node.teamName;
+    let exportTL=getTeamLeaderForExport(node.id,node.teamName);
+    if(isSeniorLeader){
+      const mgr=getTeamLeaderFor(node.id); // first person above in the tree
+      if(mgr&&mgr.teamName){exportTeamName=mgr.teamName;exportTL=mgr;}
+    }
     const baseRow={
       'USER ID':'','USER EMAIL':node.email,
       'FIRST NAME':node.firstName,'SURNAME':node.lastName,
@@ -1551,16 +1557,16 @@ function exportExcel(){
       'LEAVE TYPE':node.leaveType||'',
       'LEAVE START':node.leaveStart?fmtDate(node.leaveStart):'',
       'LEAVE END':node.leaveEnd?fmtDate(node.leaveEnd):'',
-      'TEAM NAME':node.teamName,
-      'TEAM LEADER':node.roleType==='TEAM_LEADER'?fmtPerson(node):fmtPerson(tl),
+      'TEAM NAME':exportTeamName,
+      'TEAM LEADER':node.roleType==='TEAM_LEADER'?fmtPerson(node):fmtPerson(exportTL),
       'ASM':node.roleType==='AREA_MANAGER'?fmtPerson(node):fmtPerson(asm),
       'REGIONAL MANAGER':node.roleType==='REGIONAL_MANAGER'?fmtPerson(node):fmtPerson(rm),
       'ACTION':node.notInPerigee?'PENDING_PERIGEE_ACTIVATION':'ADD',
       'CYCLE STATUS':'ACTIVE','CYCLE':4,'CYCLE START DATE':'','CYCLE END DATE':'',
     };
     rows.push(baseRow);
-    // Extra team rows (leader roles only — members can't have extraTeams)
-    (node.extraTeams||[]).forEach(extraTeam=>{
+    // Extra team rows — TEAM_LEADER only; AM+ extraTeams = teams they manage, not membership rows
+    if(!isSeniorLeader)(node.extraTeams||[]).forEach(extraTeam=>{
       const etl=getTeamLeaderForExport(node.id,extraTeam);
       rows.push({...baseRow,'TEAM NAME':extraTeam,
         'TEAM LEADER':node.roleType==='TEAM_LEADER'?fmtPerson(node):fmtPerson(etl)});
