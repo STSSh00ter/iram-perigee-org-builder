@@ -92,6 +92,9 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#eef2f7;color:#1e293b;he
 .node-card.dimmed{opacity:.4;pointer-events:none}
 .node-badge{position:absolute;top:-9px;left:50%;transform:translateX(-50%);padding:2px 9px;border-radius:20px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#fff;white-space:nowrap}
 .nip-pip{position:absolute;top:5px;right:6px;width:16px;height:16px;background:#fb923c;border-radius:50%;font-size:9px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;box-shadow:0 1px 4px rgba(251,146,60,.6)}
+.dup-pip{position:absolute;top:5px;right:26px;width:16px;height:16px;background:#7c3aed;border-radius:50%;font-size:9px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;box-shadow:0 1px 4px rgba(124,58,237,.6)}
+.node-card.is-dup{border-color:#7c3aed}
+.node-card.is-dup.selected{border-color:#6d28d9;box-shadow:0 0 0 3px rgba(124,58,237,.22)}
 .drag-handle{position:absolute;top:5px;left:5px;font-size:11px;color:#cbd5e1;line-height:1;cursor:grab;user-select:none}
 .node-name{font-weight:700;font-size:12px;margin-top:5px;color:#1e293b;padding-left:10px}
 .node-title{font-size:10px;color:#64748b;margin-top:2px;padding-left:10px}
@@ -514,6 +517,13 @@ function getRoots(){return orgNodes.filter(n=>!n.parentId);}
 function getRoleInfo(v){return ROLE_TYPES.find(r=>r.v===v)||ROLE_TYPES[4];}
 function findPerigeeUser(email){return perigeeUsers.find(u=>u.email===(email||'').trim().toLowerCase());}
 function isLeaderRole(role){return LEADER_ROLES.includes(role);}
+
+let dupEmails=new Set();
+function computeDupEmails(){
+  const seen=new Map();
+  orgNodes.forEach(n=>{if(n.email&&n.email.trim())seen.set(n.email.trim().toLowerCase(),(seen.get(n.email.trim().toLowerCase())||0)+1);});
+  dupEmails=new Set([...seen.entries()].filter(([,c])=>c>1).map(([e])=>e));
+}
 
 function getAncestorOfRole(nodeId,roleType){
   let n=getNode(nodeId);
@@ -1335,6 +1345,7 @@ function renderTreeNode(nodeId,visibleIds,matchIds){
   }
   const ri=getRoleInfo(node.roleType);
   const isNip=node.notInPerigee;
+  const isDup=!!(node.email&&dupEmails.has(node.email.trim().toLowerCase()));
   const isDimmed=visibleIds&&matchIds&&!matchIds.has(nodeId);
   const dispName=node.firstName?(node.firstName+(node.lastName?' '+node.lastName:'')):(node.email||'(unnamed)');
   const provs=getNodeProvinces(node);const extras=node.extraTeams||[];
@@ -1347,13 +1358,14 @@ function renderTreeNode(nodeId,visibleIds,matchIds){
   return`<div>
     <div class="node-slot${!node.parentId?' root-slot':''}">
     <button class="node-shift node-shift-l" onclick="event.stopPropagation();shiftNode('${nodeId}',-1)" title="Move left">◀</button>
-    <div class="node-card${!node.parentId?' is-root':''}${isSel?' selected':''}${isNip?' nip':''}${isDimmed?' dimmed':''}${node.resigned?' is-resigned':''}${lv?' is-onleave':''}"${lv?` style="--lv:${lv.c}"`:''}
+    <div class="node-card${!node.parentId?' is-root':''}${isSel?' selected':''}${isNip?' nip':''}${isDup?' is-dup':''}${isDimmed?' dimmed':''}${node.resigned?' is-resigned':''}${lv?' is-onleave':''}"${lv?` style="--lv:${lv.c}"`:''}
       data-node="${nodeId}" draggable="true"
       ondragstart="onDragStart(event,'${nodeId}')" ondragover="onDragOver(event,'${nodeId}')"
       ondragleave="onDragLeave(event,'${nodeId}')" ondrop="onDrop(event,'${nodeId}')"
       ondragend="onDragEnd()" onclick="selectNode('${nodeId}')">
       <div class="drag-handle" title="Drag to move">⠿</div>
       <div class="node-badge ${ri.color}">${ri.badge}</div>
+      ${isDup?`<div class="dup-pip" title="Duplicate email: ${node.email}">2</div>`:''}
       ${isNip?`<div class="nip-pip" title="Not in Perigee">!</div>`:''}
       ${lv?`<div class="leave-emoji ${lv.a}" title="${node.leaveType}${node.leaveStart?' · '+fmtDate(node.leaveStart):''}">${lv.e}</div>`:''}
       ${node.resigned?`<div class="resign-x" title="Resigned${node.resignedDate?' · '+fmtDate(node.resignedDate):''}"><svg viewBox="0 0 100 100" preserveAspectRatio="none"><path class="rx-stroke" d="M12,18 C30,30 55,48 88,82"/><path class="rx-stroke" d="M86,16 C66,32 42,52 14,84"/></svg><span class="resign-tag">RESIGNED${node.resignedDate?' · '+fmtDate(node.resignedDate):''}</span></div>`:''}
@@ -1377,6 +1389,7 @@ function renderTreeNode(nodeId,visibleIds,matchIds){
 }
 
 function render(){
+  computeDupEmails();
   updateStatus();renderFilterBar();
   const roots=getRoots();
   const emptyEl=document.getElementById('treeEmpty'),rootEl=document.getElementById('treeRoot');
