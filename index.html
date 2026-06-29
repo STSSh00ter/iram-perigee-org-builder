@@ -808,6 +808,11 @@ function getLeaveVisual(t){
   };
   return m[t]||{e:'🏖️',a:'lv-sway',c:'#7c3aed'};
 }
+function isActiveLeave(node){
+  if(!node.leaveType)return false;
+  // No end date = indefinite leave; otherwise check end date hasn't passed
+  return !node.leaveEnd||node.leaveEnd>=todayStr();
+}
 function renderFilterBar(){
   if(!orgNodes.length){document.getElementById('filterBar').innerHTML='';return;}
   const provs=availableProvinceFilters();
@@ -1151,13 +1156,16 @@ function collectFormInto(node,pfx){
   const _pu=findPerigeeUser(node.email);
   node.notInPerigee=perigeeUsers.length>0&&!!node.email&&!_pu;
   node.nameMismatch=!!_pu&&!nameMatchesPu(node,_pu);
-  // Leave fields
+  // Leave fields — only read dates if a leave type is selected
   node.leaveType=(document.getElementById(pfx+'leaveType')?.value||'');
-  node.leaveStart=(document.getElementById(pfx+'leaveStart')?.value||'');
-  node.leaveEnd=(document.getElementById(pfx+'leaveEnd')?.value||'');
-  if(node.leaveStart&&node.leaveStart<todayStr()){
-    toast('Leave start date must be today or a future date — cleared','warn');
-    node.leaveType='';node.leaveStart='';node.leaveEnd='';
+  if(!node.leaveType){
+    node.leaveStart='';node.leaveEnd='';
+  } else {
+    node.leaveStart=(document.getElementById(pfx+'leaveStart')?.value||'');
+    node.leaveEnd=(document.getElementById(pfx+'leaveEnd')?.value||'');
+    if(node.leaveEnd&&node.leaveEnd<todayStr()){
+      node.leaveType='';node.leaveStart='';node.leaveEnd='';
+    }
   }
   // Resigned status
   node.resigned=!!document.getElementById(pfx+'resigned')?.checked;
@@ -1609,7 +1617,7 @@ function renderTreeNode(nodeId,visibleIds,matchIds){
   const isDimmed=visibleIds&&matchIds&&!matchIds.has(nodeId);
   const dispName=node.firstName?(node.firstName+(node.lastName?' '+node.lastName:'')):(node.email||'(unnamed)');
   const provs=getNodeProvinces(node);const extras=node.extraTeams||[];
-  const lv=node.leaveType?getLeaveVisual(node.leaveType):null;
+  const lv=isActiveLeave(node)?getLeaveVisual(node.leaveType):null;
   // MEMBER: chip from any ancestor (group or leader); TL: only if inside a TEAM_GROUP; others: never
   const memberOfGrp=node.roleType==='MEMBER'?getParentGroupName(nodeId):node.roleType==='TEAM_LEADER'?getParentGroupOnly(nodeId):null;
   const hiddenCount=allCh.length-visibleCh.length;
@@ -1815,9 +1823,9 @@ function exportExcel(){
       'JOB TITLE':node.jobTitle,
       'RESIGNED':node.resigned?'YES':'',
       'RESIGNED DATE':node.resigned&&node.resignedDate?fmtDate(node.resignedDate):'',
-      'LEAVE TYPE':node.leaveType||'',
-      'LEAVE START':node.leaveStart?fmtDate(node.leaveStart):'',
-      'LEAVE END':node.leaveEnd?fmtDate(node.leaveEnd):'',
+      'LEAVE TYPE':isActiveLeave(node)?node.leaveType:'',
+      'LEAVE START':isActiveLeave(node)&&node.leaveStart?fmtDate(node.leaveStart):'',
+      'LEAVE END':isActiveLeave(node)&&node.leaveEnd?fmtDate(node.leaveEnd):'',
       'TEAM NAME':teamName,
       'TEAM LEADER':fmtPerson(tl),
       'LINE MANAGER':fmtPerson(lm),
