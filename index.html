@@ -976,7 +976,15 @@ function saveEdit(){
     const email=(document.getElementById('ep_email').value||'').trim().toLowerCase();
     if(!email){toast('Email is required','error');return;}
   }
-  collectFormInto(node,'ep_');logAudit('UPDATE',node);saveState();render();toast('Saved ✓','success');
+  collectFormInto(node,'ep_');logAudit('UPDATE',node);
+  // Auto-create TEAM_GROUP if promoted to a leader role and doesn't have one yet
+  if(node.roleType!=='MEMBER'&&node.roleType!=='TEAM_GROUP'&&!getChildren(node.id).some(c=>c.roleType==='TEAM_GROUP')){
+    const grp=makeNode(node.id);
+    grp.roleType='TEAM_GROUP';grp.teamName=node.teamName||'';
+    grp.assignedProvinces=node.assignedProvinces||'';
+    orgNodes.push(grp);logAudit('ADD',grp);
+  }
+  saveState();render();toast('Saved ✓','success');
   selectNode(selectedNodeId);
 }
 function refreshAncestorInfo(){
