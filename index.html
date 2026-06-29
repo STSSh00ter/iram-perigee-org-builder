@@ -364,6 +364,7 @@ body.mobile-layout .modal{width:96vw;max-height:90vh}
   <span>Nodes: <b id="statNodes">0</b></span>
   <span>Teams: <b id="statTeams">0</b></span>
   <span id="statNipWrap" onclick="cycleNipNodes()" style="cursor:pointer;padding:2px 8px;border-radius:12px;transition:.15s" title="Click to cycle through unregistered users">⚠ Pending Perigee: <b id="statNip" style="color:#94a3b8">0</b></span>
+  <span id="statDupWrap" onclick="cycleDupNodes()" style="cursor:pointer;padding:2px 8px;border-radius:12px;transition:.15s" title="Click to cycle through duplicate email cards">⬡ Duplicates: <b id="statDup" style="color:#94a3b8">0</b></span>
   <span id="statSync" style="margin-left:auto;font-size:10px;opacity:.6" title="Cloud sync status">☁ not connected</span>
 </div>
 <div id="filterBar"></div>
@@ -1552,6 +1553,21 @@ function updateStatus(){
     nipWrap.style.background='';
     nipWrap.style.color='#64748b';
   }
+  const dupCount=dupEmails.size;
+  const dupEl=document.getElementById('statDup');
+  const dupWrap=document.getElementById('statDupWrap');
+  if(dupEl&&dupWrap){
+    dupEl.textContent=dupCount;
+    if(dupCount>0){
+      dupEl.style.color='#a855f7';
+      dupWrap.style.background='rgba(168,85,247,.15)';
+      dupWrap.style.color='#a855f7';
+    } else {
+      dupEl.style.color='#94a3b8';
+      dupWrap.style.background='';
+      dupWrap.style.color='#64748b';
+    }
+  }
 }
 
 let warnBannerDismissed=false;
@@ -1573,6 +1589,21 @@ function cycleNipNodes(){
     if(el)el.scrollIntoView({behavior:'smooth',block:'center',inline:'center'});
   },50);
   toast(`⚠ ${nipCycleIdx} of ${nips.length}: ${(node.firstName+' '+node.lastName).trim()||node.email} — not in Perigee`,'warn');
+}
+
+let dupCycleIdx=0;
+function cycleDupNodes(){
+  const dups=orgNodes.filter(n=>n.email&&dupEmails.has(n.email.trim().toLowerCase()));
+  if(!dups.length){toast('No duplicate emails found','info');return;}
+  dupCycleIdx=dupCycleIdx%dups.length;
+  const node=dups[dupCycleIdx];
+  dupCycleIdx++;
+  selectNode(node.id);
+  setTimeout(()=>{
+    const el=document.querySelector(`[data-node="${node.id}"]`);
+    if(el)el.scrollIntoView({behavior:'smooth',block:'center',inline:'center'});
+  },50);
+  toast(`⬡ ${dupCycleIdx} of ${dups.length}: ${(node.firstName+' '+node.lastName).trim()||node.email} — duplicate email`,'warn');
 }
 
 function exportPDF(){
