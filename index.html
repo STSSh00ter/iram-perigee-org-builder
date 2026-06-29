@@ -325,6 +325,12 @@ body.mobile-layout .zoom-btn{width:38px;height:38px;font-size:18px}
 body.mobile-layout .zoom-label{min-width:52px;font-size:13px}
 /* modal fills the small screen */
 body.mobile-layout .modal{width:96vw;max-height:90vh}
+/* ── 3-tier access ── viewer-mode hides all editor-only UI ── */
+body.viewer-mode .edit-only{display:none!important}
+body.viewer-mode .node-add-btn,
+body.viewer-mode .node-addgrp-btn,
+body.viewer-mode .node-shift{display:none!important}
+body.viewer-mode .node-card{cursor:default}
 @media print{
   .zoom-controls{display:none!important}
   *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -349,12 +355,13 @@ body.mobile-layout .modal{width:96vw;max-height:90vh}
     <div><div class="hdr-title">Perigee Org Builder</div><div class="hdr-sub">Build your reporting tree &amp; export to Perigee</div></div>
   </div>
   <div class="hdr-actions">
-    <button class="btn btn-ghost btn-sm" id="btnUndo" onclick="undo()" disabled title="Undo last change (Ctrl+Z)">↩ Undo</button>
-    <button class="btn btn-ghost btn-mob-hide" onclick="loadPerigeeFile()">📂 Load Perigee Users</button>
-    <button class="btn btn-ghost btn-mob-hide" onclick="addRootNode()">＋ Add Root Person</button>
-    <button class="btn btn-ghost btn-sm btn-mob-hide" onclick="exportState()" title="Export tree for sharing with others">📤 Export Tree</button>
-    <button class="btn btn-ghost btn-sm" onclick="openAdmin()">🔒 Admin</button>
-    <button class="btn btn-sm" id="btnPush" onclick="forcePush()" style="background:#0ea5e9;color:#fff" title="Push current tree to Supabase and notify all open devices">☁ Push to All</button>
+    <button class="btn btn-ghost btn-sm edit-only" id="btnUndo" onclick="undo()" disabled title="Undo last change (Ctrl+Z)">↩ Undo</button>
+    <button class="btn btn-ghost btn-mob-hide edit-only" onclick="loadPerigeeFile()">📂 Load Perigee Users</button>
+    <button class="btn btn-ghost btn-mob-hide edit-only" onclick="addRootNode()">＋ Add Root Person</button>
+    <button class="btn btn-ghost btn-sm btn-mob-hide edit-only" onclick="exportState()" title="Export tree for sharing with others">📤 Export Tree</button>
+    <button class="btn btn-ghost btn-sm" id="btnUnlock" onclick="unlockEditing()" title="Unlock tree editing (editor password required)">🔒 Unlock Editing</button>
+    <button class="btn btn-ghost btn-sm" onclick="openAdmin()">⚙ Admin</button>
+    <button class="btn btn-sm edit-only" id="btnPush" onclick="forcePush()" style="background:#0ea5e9;color:#fff" title="Push current tree to Supabase and notify all open devices">☁ Push to All</button>
     <button class="btn btn-success" onclick="exportExcel()">⬇ Export Excel</button>
     <button class="btn btn-success" onclick="exportPDF()" id="btnPDF">🖨 Export PDF</button>
   </div>
@@ -386,9 +393,9 @@ body.mobile-layout .modal{width:96vw;max-height:90vh}
       <div class="ep-empty"><div style="font-size:40px;opacity:.3">👈</div><p>Select a node in the tree to view and edit their details here</p></div>
     </div>
     <div class="ep-footer" id="epFooter" style="display:none">
-      <button class="btn btn-primary btn-sm" onclick="saveEdit()">💾 Save</button>
-      <button class="btn btn-sm" style="background:#f1f5f9;color:#64748b" onclick="addChildNode(selectedNodeId)">＋ Add Sub</button>
-      <button class="btn btn-danger btn-sm" onclick="deleteNode(selectedNodeId)">🗑 Remove</button>
+      <button class="btn btn-primary btn-sm edit-only" onclick="saveEdit()">💾 Save</button>
+      <button class="btn btn-sm edit-only" style="background:#f1f5f9;color:#64748b" onclick="addChildNode(selectedNodeId)">＋ Add Sub</button>
+      <button class="btn btn-danger btn-sm edit-only" onclick="deleteNode(selectedNodeId)">🗑 Remove</button>
     </div>
   </div>
   <div class="zoom-controls" id="zoomControls">
@@ -890,7 +897,37 @@ function clearAll(){
   orgNodes=[];selectedNodeId=null;saveState();render();toast('Tree cleared — recoverable from Admin panel','warn');
 }
 
+// ─── ACCESS TIERS ────────────────────────────────────────────────────────────
+let editLevel=sessionStorage.getItem('iram-edit-level')||'viewer';
+function isEditor(){return editLevel==='editor';}
+function unlockEditing(){
+  if(isEditor()){
+    if(!confirm('Lock editing? You will need the password again to make changes.'))return;
+    editLevel='viewer';sessionStorage.removeItem('iram-edit-level');
+    applyEditLevel();toast('Editing locked','info');return;
+  }
+  const pw=prompt('Enter editor password:');
+  if(pw===null)return;
+  if(pw==='iRam_1'){
+    editLevel='editor';sessionStorage.setItem('iram-edit-level','editor');
+    applyEditLevel();toast('Editing unlocked ✓','success');
+  } else {
+    toast('Incorrect password','error');
+  }
+}
+function applyEditLevel(){
+  const ed=isEditor();
+  document.body.classList.toggle('viewer-mode',!ed);
+  const btn=document.getElementById('btnUnlock');
+  if(btn){
+    btn.textContent=ed?'🔓 Lock Editing':'🔒 Unlock Editing';
+    btn.style.background=ed?'rgba(220,38,38,.25)':'rgba(255,255,255,.12)';
+    btn.style.borderColor=ed?'rgba(220,38,38,.5)':'rgba(255,255,255,.2)';
+  }
+}
+
 function onDragStart(event,nodeId){
+  if(!isEditor()){event.preventDefault();return;}
   draggedNodeId=nodeId;
   event.dataTransfer.effectAllowed='move';
   event.dataTransfer.setData('text/plain',nodeId);
@@ -2225,6 +2262,7 @@ function disconnectSupa(){
 }
 
 // ─── INIT ───────────────────────────────────────────────────────────────────
+applyEditLevel();
 loadState();
 detectLayout();
 document.body.classList.toggle('compact-view',compactView);
