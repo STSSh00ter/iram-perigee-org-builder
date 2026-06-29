@@ -559,6 +559,7 @@ function loadState(){
   try{
     const d=localStorage.getItem('iram-org-v5');if(d)orgNodes=JSON.parse(d);
     const p=localStorage.getItem('iram-perigee-v1');if(p)perigeeUsers=JSON.parse(p);
+    const c=localStorage.getItem('iram-cycle-v1');if(c){const pc=JSON.parse(c);callCycleData=Array.isArray(pc)?pc:(pc.rows||[]);}
   }catch(e){}
 }
 function savePerigee(){
@@ -586,6 +587,39 @@ async function loadPerigeeFromCloud(){
     perigeeUsers=data.nodes;
     savePerigee();
     return true;
+  }catch(e){return false;}
+}
+
+function saveCycleData(){
+  const meta={loadedAt:localStorage.getItem('iram-cycle-loaded-at')||'',filename:localStorage.getItem('iram-cycle-filename')||''};
+  try{localStorage.setItem('iram-cycle-v1',JSON.stringify({rows:callCycleData,meta}));}catch(e){}
+  syncCycleToCloud();
+}
+async function syncCycleToCloud(){
+  if(!_supa||!callCycleData.length)return;
+  try{
+    const meta={loadedAt:localStorage.getItem('iram-cycle-loaded-at')||'',filename:localStorage.getItem('iram-cycle-filename')||''};
+    const{error}=await _supa.from('iram_org_state').upsert({id:'callcycle',nodes:{rows:callCycleData,meta},updated_at:new Date().toISOString(),updated_by:getDeviceId()},{onConflict:'id'});
+    if(error)console.warn('Cycle sync error:',error.message||error);
+  }catch(e){console.warn('Cycle sync error:',e);}
+}
+async function loadCycleFromCloud(){
+  if(!_supa)return false;
+  try{
+    const{data,error}=await _supa.from('iram_org_state').select('nodes').eq('id','callcycle').single();
+    if(error||!data||!data.nodes)return false;
+    const payload=data.nodes;
+    if(Array.isArray(payload)){callCycleData=payload;}
+    else if(payload.rows){
+      callCycleData=payload.rows;
+      if(payload.meta){
+        if(payload.meta.loadedAt)localStorage.setItem('iram-cycle-loaded-at',payload.meta.loadedAt);
+        if(payload.meta.filename)localStorage.setItem('iram-cycle-filename',payload.meta.filename);
+      }
+    }
+    const meta={loadedAt:localStorage.getItem('iram-cycle-loaded-at')||'',filename:localStorage.getItem('iram-cycle-filename')||''};
+    try{localStorage.setItem('iram-cycle-v1',JSON.stringify({rows:callCycleData,meta}));}catch(e){}
+    return callCycleData.length>0;
   }catch(e){return false;}
 }
 
@@ -2306,12 +2340,15 @@ async function forcePush(){
   setSyncStatus('☁ pushing…','#f59e0b');
   try{
     const slim=perigeeUsers.map(u=>({email:u.email,firstName:u.firstName,lastName:u.lastName,status:u.status,access:u.access}));
-    const[r1,r2]=await Promise.all([
+    const cycleMeta={loadedAt:localStorage.getItem('iram-cycle-loaded-at')||'',filename:localStorage.getItem('iram-cycle-filename')||''};
+    const[r1,r2,r3]=await Promise.all([
       _supa.from('iram_org_state').upsert({id:'main',nodes:orgNodes,updated_at:new Date().toISOString(),updated_by:getDeviceId()},{onConflict:'id'}),
-      slim.length?_supa.from('iram_org_state').upsert({id:'perigee',nodes:slim,updated_at:new Date().toISOString(),updated_by:getDeviceId()},{onConflict:'id'}):Promise.resolve({error:null})
+      slim.length?_supa.from('iram_org_state').upsert({id:'perigee',nodes:slim,updated_at:new Date().toISOString(),updated_by:getDeviceId()},{onConflict:'id'}):Promise.resolve({error:null}),
+      callCycleData.length?_supa.from('iram_org_state').upsert({id:'callcycle',nodes:{rows:callCycleData,meta:cycleMeta},updated_at:new Date().toISOString(),updated_by:getDeviceId()},{onConflict:'id'}):Promise.resolve({error:null})
     ]);
     if(r1&&r1.error)throw r1.error;
     if(r2&&r2.error)throw r2.error;
+    if(r3&&r3.error)throw r3.error;
     setSyncStatus('☁ synced '+new Date().toLocaleTimeString(),'#059669');
     toast(`Pushed ${orgNodes.length} nodes — other devices will update ✓`,'success');
   }catch(e){
@@ -2335,6 +2372,8 @@ function subscribeRealtime(){
         loadFromCloud().then(ok=>{if(ok){render();toast('Tree updated ↓','info');}});
       }else if(row.id==='perigee'){
         loadPerigeeFromCloud().then(ok=>{if(ok){recalcPerigeeFlags(orgNodes);render();}});
+      }else if(row.id==='callcycle'){
+        loadCycleFromCloud().then(ok=>{if(ok)toast('Call cycle updated ↓','info');});
       }
     })
     .subscribe(status=>{
@@ -2372,7 +2411,8 @@ function loadCallCycleFile(afterLoad){
         }));
         localStorage.setItem('iram-cycle-loaded-at',new Date().toISOString());
         localStorage.setItem('iram-cycle-filename',file.name);
-        toast(`Call cycle loaded: ${callCycleData.length} users from "${file.name}"`,'success');
+        saveCycleData();
+        toast(`Call cycle loaded & synced: ${callCycleData.length} users from "${file.name}"`,'success');
         if(afterLoad)afterLoad();
       }catch(err){toast('Failed to read file: '+err.message,'error');}
     };
@@ -2765,7 +2805,7 @@ if(orgNodes.length===0){orgNodes=getInitialOrg();saveState();}
 recalcMemberTeams();
 render();
 if(initSupabase()){
-  Promise.all([loadFromCloud(),loadPerigeeFromCloud()]).then(([treeOk,perigeeOk])=>{
+  Promise.all([loadFromCloud(),loadPerigeeFromCloud(),loadCycleFromCloud()]).then(([treeOk,perigeeOk,cycleOk])=>{
     if(perigeeOk)recalcPerigeeFlags(orgNodes);
     if(treeOk||perigeeOk)render();
     subscribeRealtime();
