@@ -454,6 +454,7 @@ body.viewer-mode .node-card{cursor:default}
       <div class="admin-tabs">
         <button id="adminTabLog" class="admin-tab active" onclick="switchAdminTab('log')">📋 Audit Log</button>
         <button id="adminTabTrash" class="admin-tab" onclick="switchAdminTab('trash')">🗑 Deleted Items</button>
+        <button id="adminTabCycle" class="admin-tab" onclick="switchAdminTab('cycle')">📊 Validate</button>
         <button id="adminTabSync" class="admin-tab" onclick="switchAdminTab('sync')">☁ Cloud Sync</button>
         <button id="adminTabData" class="admin-tab" onclick="switchAdminTab('data')">🗂 Data</button>
       </div>
@@ -1822,7 +1823,7 @@ function saveTrash(t){try{localStorage.setItem('iram-trash-v1',JSON.stringify(t)
 
 // ─── ADMIN PANEL ─────────────────────────────────────────────────────────────
 const ADMIN_PASS='iRam@admin2026';
-let adminAuthed=false,adminTab='log';
+let adminAuthed=false,adminTab='log',callCycleData=[];
 function openAdmin(){
   if(!adminAuthed){
     const pw=prompt('Admin password:');
@@ -1843,10 +1844,12 @@ function switchAdminTab(tab){
   adminTab=tab;
   document.getElementById('adminTabLog').className='admin-tab'+(tab==='log'?' active':'');
   document.getElementById('adminTabTrash').className='admin-tab'+(tab==='trash'?' active':'');
+  document.getElementById('adminTabCycle').className='admin-tab'+(tab==='cycle'?' active':'');
   document.getElementById('adminTabSync').className='admin-tab'+(tab==='sync'?' active':'');
   document.getElementById('adminTabData').className='admin-tab'+(tab==='data'?' active':'');
   if(tab==='sync'){renderSyncTab();return;}
   if(tab==='data'){renderDataTab();return;}
+  if(tab==='cycle'){renderCycleTab();return;}
   const log=getAuditLog(),trash=getTrash();
   if(tab==='log'){
     const rows=log.slice().reverse().slice(0,300);
@@ -2212,6 +2215,113 @@ function subscribeRealtime(){
   },60000);
 }
 
+function loadCallCycleFile(afterLoad){
+  const inp=document.createElement('input');inp.type='file';inp.accept='.xlsx,.xls';
+  inp.onchange=e=>{
+    const file=e.target.files[0];if(!file)return;
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      try{
+        const wb=XLSX.read(ev.target.result,{type:'binary'});
+        const sheetName=wb.SheetNames.find(s=>s.toLowerCase().includes('teams and user'))||wb.SheetNames[0];
+        const rows=XLSX.utils.sheet_to_json(wb.Sheets[sheetName]);
+        callCycleData=rows.filter(r=>r['USER EMAIL']).map(r=>({
+          email:(r['USER EMAIL']||'').trim().toLowerCase(),
+          firstName:r['FIRST NAME']||'',lastName:r['SURNAME']||'',
+          teamName:(r['TEAM NAME']||'').trim(),status:r['STATUS']||'',
+        }));
+        toast(`Call cycle loaded: ${callCycleData.length} users from "${file.name}"`,'success');
+        if(afterLoad)afterLoad();
+      }catch(err){toast('Failed to read file: '+err.message,'error');}
+    };
+    reader.readAsBinaryString(file);
+  };
+  inp.click();
+}
+function renderCycleTab(){
+  const el=document.getElementById('adminContent');
+  if(!callCycleData.length){
+    el.innerHTML=`
+      <div style="text-align:center;padding:60px 20px">
+        <div style="font-size:48px;margin-bottom:16px">📊</div>
+        <div style="font-size:15px;font-weight:800;color:#1e293b;margin-bottom:8px">No call cycle loaded</div>
+        <div style="font-size:12px;color:#64748b;margin-bottom:24px;line-height:1.6">Upload the current call cycle Excel to cross-validate against the org tree.<br>Uses the <b>Teams And User Cycle</b> sheet.</div>
+        <button class="btn btn-primary" onclick="loadCallCycleFile(()=>switchAdminTab('cycle'))">📂 Load Call Cycle Excel…</button>
+      </div>`;
+    return;
+  }
+  const treeNodes=orgNodes.filter(n=>n.email&&n.roleType!=='TEAM_GROUP');
+  const treeByEmail=new Map(treeNodes.map(n=>[n.email.trim().toLowerCase(),n]));
+  const cycleByEmail=new Map(callCycleData.map(r=>[r.email,r]));
+  // 1. Team mismatch — email in both but team differs
+  const mismatches=[];
+  treeNodes.forEach(n=>{
+    const email=n.email.trim().toLowerCase();
+    const cr=cycleByEmail.get(email);if(!cr)return;
+    const{teamName:treeTeam}=getMembershipInfo(n.id);
+    const cycleTeam=cr.teamName;
+    if(treeTeam&&cycleTeam&&treeTeam.trim().toLowerCase()!==cycleTeam.trim().toLowerCase())
+      mismatches.push({node:n,treeTeam,cycleTeam});
+  });
+  // 2. On tree, not on cycle
+  const treeOnly=treeNodes.filter(n=>!cycleByEmail.has(n.email.trim().toLowerCase()));
+  // 3. On cycle, not on tree
+  const cycleOnly=callCycleData.filter(r=>!treeByEmail.has(r.email));
+  const matched=callCycleData.length-cycleOnly.length-mismatches.length;
+  const rowCard=(label,val,bg,border,txtCol)=>`<div style="background:${bg};border:1px solid ${border};border-radius:10px;padding:14px;text-align:center"><div style="font-size:24px;font-weight:900;color:${txtCol}">${val}</div><div style="font-size:10.5px;font-weight:700;color:${txtCol};opacity:.8;margin-top:3px">${label}</div></div>`;
+  el.innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+      <div>
+        <div style="font-size:14px;font-weight:800;color:#1e293b;margin-bottom:3px">Call Cycle Validation</div>
+        <div style="font-size:11.5px;color:#64748b">${callCycleData.length} users in cycle &nbsp;·&nbsp; ${treeNodes.length} in tree</div>
+      </div>
+      <button class="btn btn-sm" style="background:#f1f5f9;color:#64748b" onclick="loadCallCycleFile(()=>switchAdminTab('cycle'))">↺ Load new file</button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:24px">
+      ${rowCard('Fully Matched',matched,'#dcfce7','#86efac','#15803d')}
+      ${rowCard('Team Mismatch',mismatches.length,mismatches.length?'#fef9c3':'#f8fafc',mismatches.length?'#fde047':'#e2e8f0',mismatches.length?'#854d0e':'#94a3b8')}
+      ${rowCard('On Tree, Not Cycle',treeOnly.length,treeOnly.length?'#fee2e2':'#f8fafc',treeOnly.length?'#fca5a5':'#e2e8f0',treeOnly.length?'#dc2626':'#94a3b8')}
+      ${rowCard('On Cycle, Not Tree',cycleOnly.length,cycleOnly.length?'#fff7ed':'#f8fafc',cycleOnly.length?'#fed7aa':'#e2e8f0',cycleOnly.length?'#c2410c':'#94a3b8')}
+    </div>
+    ${mismatches.length?`
+    <div style="margin-bottom:20px">
+      <div style="font-size:11.5px;font-weight:800;color:#854d0e;margin-bottom:10px">⚠ Team Mismatch (${mismatches.length}) — email found in both but assigned to a different team</div>
+      ${mismatches.map(({node,treeTeam,cycleTeam})=>`
+        <div style="background:#fff;border:1px solid #fde047;border-radius:8px;padding:10px 14px;margin-bottom:6px;display:flex;align-items:center;gap:12px">
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:700;font-size:12.5px;color:#1e293b">${(node.firstName+' '+node.lastName).trim()||node.email}</div>
+            <div style="font-size:11px;color:#64748b;margin-top:1px">${node.email}</div>
+            <div style="display:flex;gap:6px;margin-top:5px;flex-wrap:wrap">
+              <span style="font-size:10px;background:#dbeafe;color:#1e40af;padding:2px 9px;border-radius:10px;font-weight:700">Tree: ${treeTeam}</span>
+              <span style="font-size:10px;background:#fef9c3;color:#854d0e;padding:2px 9px;border-radius:10px;font-weight:700">Cycle: ${cycleTeam}</span>
+            </div>
+          </div>
+          <button class="btn btn-sm" style="background:#2563eb;color:#fff;font-size:10.5px;flex-shrink:0" onclick="closeAdmin();selectNode('${node.id}')">View in tree →</button>
+        </div>`).join('')}
+    </div>`:''}
+    ${treeOnly.length?`
+    <div style="margin-bottom:20px">
+      <div style="font-size:11.5px;font-weight:800;color:#991b1b;margin-bottom:10px">On Tree — NOT on Call Cycle (${treeOnly.length})</div>
+      ${treeOnly.map(node=>`
+        <div style="background:#fff;border:1px solid #fca5a5;border-radius:8px;padding:9px 14px;margin-bottom:5px;display:flex;align-items:center;gap:10px">
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:700;font-size:12px;color:#1e293b">${(node.firstName+' '+node.lastName).trim()||node.email}</div>
+            <div style="font-size:11px;color:#64748b">${node.email} &nbsp;·&nbsp; ${getMembershipInfo(node.id).teamName||'(no team)'} &nbsp;·&nbsp; ${getRoleInfo(node.roleType).label}</div>
+          </div>
+          <button class="btn btn-sm" style="background:#f1f5f9;color:#475569;font-size:10.5px;flex-shrink:0" onclick="closeAdmin();selectNode('${node.id}')">View →</button>
+        </div>`).join('')}
+    </div>`:''}
+    ${cycleOnly.length?`
+    <div style="margin-bottom:20px">
+      <div style="font-size:11.5px;font-weight:800;color:#c2410c;margin-bottom:10px">On Call Cycle — NOT on Tree (${cycleOnly.length})</div>
+      ${cycleOnly.map(r=>`
+        <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:9px 14px;margin-bottom:5px">
+          <div style="font-weight:700;font-size:12px;color:#1e293b">${((r.firstName||'')+' '+(r.lastName||'')).trim()||r.email}</div>
+          <div style="font-size:11px;color:#64748b">${r.email} &nbsp;·&nbsp; ${r.teamName||'(no team)'} &nbsp;·&nbsp; ${r.status||'—'}</div>
+        </div>`).join('')}
+    </div>`:''}
+    ${!mismatches.length&&!treeOnly.length&&!cycleOnly.length?'<div style="text-align:center;padding:50px;font-size:14px;font-weight:800;color:#059669">All users and teams match perfectly</div>':''}`;
+}
 function renderDataTab(){
   const tSet=new Set(orgNodes.flatMap(n=>[n.teamName,...(n.extraTeams||[])]).filter(Boolean));
   document.getElementById('adminContent').innerHTML=`
