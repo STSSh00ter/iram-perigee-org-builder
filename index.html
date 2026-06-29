@@ -498,6 +498,8 @@ function getNipWaDisplay(){return localStorage.getItem('iram-nip-wa-display')||g
 function getHrEmail(){return localStorage.getItem('iram-hr-email')||'HR@iram.co.za';}
 function getHrWa(){return localStorage.getItem('iram-hr-wa')||'';}
 function getHrWaDisplay(){return localStorage.getItem('iram-hr-wa-display')||getHrWa();}
+function getEditorPass(){return localStorage.getItem('iram-editor-pass')||'iRam_1';}
+function getAdminPass(){return localStorage.getItem('iram-admin-pass')||'iRam@admin2026';}
 const ROLE_TYPES=[
   {v:'REGIONAL_MANAGER',label:'Regional Manager',color:'role-reg',badge:'Reg. Manager'},
   {v:'CHANNEL_HEAD',label:'Channel Head',color:'role-chan',badge:'Channel Head'},
@@ -1007,7 +1009,7 @@ function unlockEditing(){
   }
   const pw=prompt('Enter editor password:');
   if(pw===null)return;
-  if(pw==='iRam_1'){
+  if(pw===getEditorPass()){
     editLevel='editor';sessionStorage.setItem('iram-edit-level','editor');
     applyEditLevel();
     promptSetDeviceName(true); // silently skip if already set
@@ -1997,13 +1999,12 @@ function getTrash(){try{return JSON.parse(localStorage.getItem('iram-trash-v1')|
 function saveTrash(t){try{localStorage.setItem('iram-trash-v1',JSON.stringify(t));}catch(e){}}
 
 // ─── ADMIN PANEL ─────────────────────────────────────────────────────────────
-const ADMIN_PASS='iRam@admin2026';
 let adminAuthed=false,adminTab='log',callCycleData=[];
 function openAdmin(){
   if(!adminAuthed){
     const pw=prompt('Admin password:');
     if(pw===null)return;
-    if(pw!==ADMIN_PASS){toast('Incorrect password','error');return;}
+    if(pw!==getAdminPass()){toast('Incorrect password','error');return;}
     adminAuthed=true;
   }
   refreshAdminDeviceLabel();
@@ -2711,6 +2712,38 @@ function renderSettingsTab(){
       </div>
     </div>
 
+    <div class="admin-card" style="border-top:3px solid #1e40af">
+      <div class="admin-section-label" style="color:#1d4ed8">Passwords</div>
+      <div style="font-size:10.5px;color:#64748b;margin-bottom:12px">Changes take effect immediately on this device. Each device stores its own password locally.</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div>
+          <div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:8px">🔒 Editor Password</div>
+          <div class="fg"><label class="fl">New password</label>
+            <div style="display:flex;gap:6px"><input id="editorPassNew" class="fc" type="password" placeholder="New editor password" autocomplete="new-password"><button onclick="togglePassVis('editorPassNew')" style="background:none;border:1px solid #e2e8f0;border-radius:6px;padding:0 8px;cursor:pointer;color:#64748b;flex-shrink:0" title="Show/hide">👁</button></div>
+          </div>
+          <div class="fg" style="margin-bottom:10px"><label class="fl">Confirm</label>
+            <input id="editorPassConfirm" class="fc" type="password" placeholder="Repeat new password" autocomplete="new-password">
+          </div>
+          <button class="btn btn-sm" style="background:#1d4ed8;color:#fff" onclick="saveEditorPass()">💾 Save editor password</button>
+          <div id="editorPassFeedback" style="margin-top:6px;font-size:11px;display:none"></div>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:8px">🛡 Admin Password</div>
+          <div class="fg"><label class="fl">New password</label>
+            <div style="display:flex;gap:6px"><input id="adminPassNew" class="fc" type="password" placeholder="New admin password" autocomplete="new-password"><button onclick="togglePassVis('adminPassNew')" style="background:none;border:1px solid #e2e8f0;border-radius:6px;padding:0 8px;cursor:pointer;color:#64748b;flex-shrink:0" title="Show/hide">👁</button></div>
+          </div>
+          <div class="fg"><label class="fl">Confirm</label>
+            <input id="adminPassConfirm" class="fc" type="password" placeholder="Repeat new password" autocomplete="new-password">
+          </div>
+          <div class="fg" style="margin-bottom:10px"><label class="fl">Current admin password <span style="color:#dc2626;font-weight:400">(required)</span></label>
+            <input id="adminPassCurrent" class="fc" type="password" placeholder="Enter current admin password" autocomplete="current-password">
+          </div>
+          <button class="btn btn-sm" style="background:#1d4ed8;color:#fff" onclick="saveAdminPass()">💾 Save admin password</button>
+          <div id="adminPassFeedback" style="margin-top:6px;font-size:11px;display:none"></div>
+        </div>
+      </div>
+    </div>
+
     <div class="admin-card" style="font-size:11px;color:#64748b;line-height:1.7">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
         <div>
@@ -2726,6 +2759,35 @@ function renderSettingsTab(){
         </div>
       </div>
     </div>`;
+}
+function togglePassVis(id){
+  const el=document.getElementById(id);if(!el)return;
+  el.type=el.type==='password'?'text':'password';
+}
+function saveEditorPass(){
+  const np=(document.getElementById('editorPassNew').value||'').trim();
+  const cp=(document.getElementById('editorPassConfirm').value||'').trim();
+  const fb=document.getElementById('editorPassFeedback');
+  if(!np){fb.style.display='block';fb.style.color='#dc2626';fb.textContent='Please enter a new password.';return;}
+  if(np!==cp){fb.style.display='block';fb.style.color='#dc2626';fb.textContent='Passwords do not match.';return;}
+  localStorage.setItem('iram-editor-pass',np);
+  document.getElementById('editorPassNew').value='';document.getElementById('editorPassConfirm').value='';
+  fb.style.display='block';fb.style.color='#059669';fb.textContent='✓ Editor password updated.';
+  setTimeout(()=>{fb.style.display='none';},3000);
+}
+function saveAdminPass(){
+  const np=(document.getElementById('adminPassNew').value||'').trim();
+  const cp=(document.getElementById('adminPassConfirm').value||'').trim();
+  const cur=(document.getElementById('adminPassCurrent').value||'').trim();
+  const fb=document.getElementById('adminPassFeedback');
+  if(cur!==getAdminPass()){fb.style.display='block';fb.style.color='#dc2626';fb.textContent='Current password is incorrect.';return;}
+  if(!np){fb.style.display='block';fb.style.color='#dc2626';fb.textContent='Please enter a new password.';return;}
+  if(np!==cp){fb.style.display='block';fb.style.color='#dc2626';fb.textContent='Passwords do not match.';return;}
+  localStorage.setItem('iram-admin-pass',np);
+  adminAuthed=false; // force re-auth with new password next open
+  document.getElementById('adminPassNew').value='';document.getElementById('adminPassConfirm').value='';document.getElementById('adminPassCurrent').value='';
+  fb.style.display='block';fb.style.color='#059669';fb.textContent='✓ Admin password updated. You will need the new password next time.';
+  setTimeout(()=>{fb.style.display='none';},4000);
 }
 
 function saveNipSettings(){
