@@ -610,6 +610,12 @@ function getTeamLeaderFor(id){
 }
 function getASMFor(id){return getAncestorOfRole(id,'AREA_MANAGER');}
 function getRegMgrFor(id){return getAncestorOfRole(id,'REGIONAL_MANAGER');}
+function getDirectManager(nodeId){
+  const node=getNode(nodeId);if(!node)return null;
+  let pid=node.parentId;
+  while(pid){const p=getNode(pid);if(!p)break;if(p.roleType!=='TEAM_GROUP')return p;pid=p.parentId;}
+  return null;
+}
 
 // Membership info: a person belongs to exactly ONE group (the nearest TEAM_GROUP above them).
 // Their TEAM LEADER = the person who owns/manages that group.
@@ -920,7 +926,9 @@ function unlockEditing(){
   if(pw===null)return;
   if(pw==='iRam_1'){
     editLevel='editor';sessionStorage.setItem('iram-edit-level','editor');
-    applyEditLevel();toast('Editing unlocked ✓','success');
+    applyEditLevel();
+    promptSetDeviceName(true); // silently skip if already set
+    toast('Editing unlocked ✓','success');
   } else {
     toast('Incorrect password','error');
   }
@@ -1055,10 +1063,12 @@ function saveEdit(){
 }
 function refreshAncestorInfo(){
   const el=document.getElementById('ep_ancestorInfo');if(!el)return;
+  const lm=getDirectManager(selectedNodeId);
   const tl=getTeamLeaderFor(selectedNodeId);
   const asm=getASMFor(selectedNodeId);const rm=getRegMgrFor(selectedNodeId);
   el.innerHTML=`
-    <div class="fg"><label class="fl">Reports To (auto)</label><input class="fc" readonly value="${fmtPerson(tl)||'—'}"></div>
+    <div class="fg"><label class="fl">Line Manager (direct)</label><input class="fc" readonly value="${fmtPerson(lm)||'—'}"></div>
+    <div class="fg"><label class="fl">Team Leader (auto)</label><input class="fc" readonly value="${fmtPerson(tl)||'—'}"></div>
     <div class="fg"><label class="fl">Area Manager (auto)</label><input class="fc" readonly value="${fmtPerson(asm)||'—'}"></div>
     <div class="fg"><label class="fl">Regional Manager (auto)</label><input class="fc" readonly value="${fmtPerson(rm)||'—'}"></div>`;
 }
@@ -1185,12 +1195,12 @@ function buildFormHTML(node,pfx){
     <div id="${pfx}nipAlert" class="nip-alert" style="display:${nipShow?'block':'none'}">
       <div class="nip-title">⚠️ Not in Perigee system</div>
       <div style="margin-bottom:8px;font-size:10px;line-height:1.4">This person needs to be added by Outer Join before they can be included in a call cycle upload.</div>
-      <div class="nip-row"><span class="nip-label">📧</span><span class="nip-val">${NIP_EMAIL} <span style="opacity:.6;font-size:9px">· cc: HR@iram.co.za</span></span></div>
+      <div class="nip-row"><span class="nip-label" style="font-size:9px;font-weight:800;color:#9a3412;width:auto;padding:1px 5px;background:#fee2e2;border-radius:3px">EMAIL</span><span class="nip-val">${NIP_EMAIL} <span style="opacity:.6;font-size:9px">· cc: HR@iram.co.za</span></span></div>
       <div class="nip-actions">
         <button class="btn-copy" onclick="copyText('${NIP_EMAIL}')">Copy Email</button>
         <a href="${nipEmailHref}" class="btn-wa" style="background:#2563eb">Open Email ↗</a>
       </div>
-      <div class="nip-row" style="margin-top:6px"><span class="nip-label">💬</span><span class="nip-val">${NIP_WA_DISPLAY}</span></div>
+      <div class="nip-row" style="margin-top:6px"><span class="nip-label" style="font-size:9px;font-weight:800;color:#166534;width:auto;padding:1px 5px;background:#dcfce7;border-radius:3px">WA</span><span class="nip-val">${NIP_WA_DISPLAY}</span></div>
       <div class="nip-actions">
         <button class="btn-copy" onclick="copyText('${NIP_WA_DISPLAY}')">Copy Number</button>
         <a href="${nipWaHref}" target="_blank" class="btn-wa">WhatsApp ↗</a>
@@ -1678,7 +1688,7 @@ function exportExcel(){
   // appearing as TEAM LEADER in their subordinates' rows — never in their own.
   orgNodes.forEach(node=>{
     if(node.roleType==='TEAM_GROUP')return;
-    const asm=getASMFor(node.id),rm=getRegMgrFor(node.id);
+    const lm=getDirectManager(node.id),asm=getASMFor(node.id),rm=getRegMgrFor(node.id);
     const pu=findPerigeeUser(node.email);
     const{teamName,tl}=getMembershipInfo(node.id);
     rows.push({
@@ -1694,6 +1704,7 @@ function exportExcel(){
       'LEAVE END':node.leaveEnd?fmtDate(node.leaveEnd):'',
       'TEAM NAME':teamName,
       'TEAM LEADER':fmtPerson(tl),
+      'LINE MANAGER':fmtPerson(lm),
       'ASM':node.roleType==='AREA_MANAGER'?fmtPerson(node):fmtPerson(asm),
       'REGIONAL MANAGER':node.roleType==='REGIONAL_MANAGER'?fmtPerson(node):fmtPerson(rm),
       'ACTION':node.notInPerigee?'PENDING_PERIGEE_ACTIVATION':'ADD',
@@ -1777,11 +1788,20 @@ document.addEventListener('keydown',e=>{
   if((e.ctrlKey||e.metaKey)&&e.key==='z'&&document.activeElement.tagName==='BODY'){e.preventDefault();undo();}
 });
 
-// ─── DEVICE ID ──────────────────────────────────────────────────────────────
+// ─── DEVICE ID / NAME ───────────────────────────────────────────────────────
 function getDeviceId(){
   let id=localStorage.getItem('iram-device-id');
   if(!id){id='DEV-'+Date.now().toString(36).toUpperCase()+'-'+Math.random().toString(36).substr(2,5).toUpperCase();localStorage.setItem('iram-device-id',id);}
   return id;
+}
+function getDeviceName(){return localStorage.getItem('iram-device-name')||getDeviceId();}
+function promptSetDeviceName(silent){
+  const cur=localStorage.getItem('iram-device-name');
+  if(silent&&cur)return; // already set — skip the prompt
+  const val=prompt('Enter your display name for the audit log\n(e.g. "Sean – SeanG-iRam" or just your name):', cur||'');
+  if(val===null)return;
+  const t=(val||'').trim();
+  if(t){localStorage.setItem('iram-device-name',t);}else{localStorage.removeItem('iram-device-name');}
 }
 
 // ─── AUDIT LOG ──────────────────────────────────────────────────────────────
@@ -1789,7 +1809,7 @@ function getAuditLog(){try{return JSON.parse(localStorage.getItem('iram-audit-v1
 function saveAuditLog(log){try{localStorage.setItem('iram-audit-v1',JSON.stringify(log.slice(-1000)));}catch(e){}}
 function logAudit(action,node,detail=''){
   const log=getAuditLog();
-  log.push({id:uid(),action,nodeId:node.id,name:(node.firstName+' '+node.lastName).trim()||node.email,email:node.email,team:node.teamName,role:node.roleType,timestamp:new Date().toISOString(),deviceId:getDeviceId(),detail});
+  log.push({id:uid(),action,nodeId:node.id,name:(node.firstName+' '+node.lastName).trim()||node.email,email:node.email,team:node.teamName,role:node.roleType,timestamp:new Date().toISOString(),deviceId:getDeviceId(),deviceName:getDeviceName(),detail});
   saveAuditLog(log);
 }
 
@@ -1807,11 +1827,15 @@ function openAdmin(){
     if(pw!==ADMIN_PASS){toast('Incorrect password','error');return;}
     adminAuthed=true;
   }
-  document.getElementById('adminDeviceLabel').textContent='Device ID: '+getDeviceId();
+  refreshAdminDeviceLabel();
   switchAdminTab('log');
   document.getElementById('adminModal').classList.add('open');
 }
 function closeAdmin(){document.getElementById('adminModal').classList.remove('open');}
+function refreshAdminDeviceLabel(){
+  const el=document.getElementById('adminDeviceLabel');if(!el)return;
+  el.innerHTML=`Your name in audit log: <b style="color:#7dd3fc">${getDeviceName()}</b> &nbsp;<button onclick="promptSetDeviceName(false);refreshAdminDeviceLabel()" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:10px;padding:0;text-decoration:underline">✎ change</button>`;
+}
 function switchAdminTab(tab){
   adminTab=tab;
   document.getElementById('adminTabLog').className='admin-tab'+(tab==='log'?' active':'');
@@ -1845,7 +1869,7 @@ function switchAdminTab(tab){
           <td style="font-weight:600;color:#1e293b">${e.name||e.email||'—'}</td>
           <td style="color:#64748b">${e.team||'—'}</td>
           <td style="color:#94a3b8;white-space:nowrap;font-size:11.5px">${new Date(e.timestamp).toLocaleString()}</td>
-          <td style="color:#94a3b8;font-size:11px;font-family:monospace">${(e.deviceId||'').slice(0,18)}</td>
+          <td style="color:#94a3b8;font-size:11px">${e.deviceName||(e.deviceId||'').slice(0,18)}</td>
         </tr>`).join('')}
         ${rows.length===0?'<tr><td colspan="5" style="padding:60px;text-align:center;color:#94a3b8;font-size:13px">📋 No audit entries yet</td></tr>':''}
         </tbody></table>`;
