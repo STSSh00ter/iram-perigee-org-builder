@@ -1281,6 +1281,7 @@ function buildFormHTML(node,pfx){
   const updEmailBody=encodeURIComponent(`Hi Laurette,\n\nPlease update the name for the following Perigee user:\n\nEmail: ${node.email||'—'}\nName in Perigee currently: ${puName||'—'}\nCorrect name (from tree/HR): ${nipName}\n\nKindly confirm once updated.\n\nRegards,\niRam`);
   const updEmailHref=`mailto:${getNipEmail()}?subject=${updSubject}&body=${updEmailBody}`;
   const updWaHref=`https://wa.me/${getNipWa()}?text=${encodeURIComponent(`Hi Laurette\n\nName update needed for Perigee user:\n\nEmail: ${node.email||'-'}\nName in Perigee: ${puName||'-'}\nCorrect name: ${nipName}\n\nPlease update.\n\nThank you!`)}`;
+  const autoRemoveDate=(()=>{if(!node.resigned||!node.resignedDate)return'';const d=new Date(node.resignedDate);d.setDate(d.getDate()+45);return fmtDate(d.toISOString().slice(0,10));})();
   const viewerBanner=!isEditor()?`<div class="viewer-lock-strip">🔒 View only — unlock editing to make changes</div>`:'';
   return`${viewerBanner}
     <div class="section-div">Role &amp; Team</div>
@@ -1413,6 +1414,7 @@ function buildFormHTML(node,pfx){
     <div id="${pfx}resignedDateSection" class="fg" style="display:${node.resigned?'':'none'};margin-top:8px">
       <label class="fl">Last day / resigned date (optional)</label>
       <input type="date" id="${pfx}resignedDate" class="fc" value="${node.resignedDate||''}">
+      ${autoRemoveDate?`<div style="margin-top:6px;padding:7px 10px;background:#fef9c3;border:1px solid #fde68a;border-radius:6px;font-size:11px;color:#92400e;line-height:1.5">⏱ Auto-removed from tree view on <b>${autoRemoveDate}</b> (45 days after resigned date)</div>`:`<div style="margin-top:6px;padding:7px 10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;font-size:11px;color:#64748b">Enter a resigned date to enable automatic removal from view after 45 days</div>`}
     </div>
     </div>
     ${pfx.startsWith('ep_')?`
@@ -1923,14 +1925,15 @@ function exportExcel(){
     const resignedData=resignedNodes.map(node=>{
       const{teamName,tl}=getMembershipInfo(node.id);
       const lm=getDirectManager(node.id);
-      return{'USER EMAIL':node.email,'FIRST NAME':node.firstName,'SURNAME':node.lastName,'RESIGNED DATE':node.resignedDate?fmtDate(node.resignedDate):'','TEAM NAME':teamName,'TEAM LEADER':fmtPerson(tl),'LINE MANAGER':fmtPerson(lm)};
+      const ard=(()=>{if(!node.resignedDate)return'';const d=new Date(node.resignedDate);d.setDate(d.getDate()+45);return fmtDate(d.toISOString().slice(0,10));})();
+      return{'USER EMAIL':node.email,'FIRST NAME':node.firstName,'SURNAME':node.lastName,'RESIGNED DATE':node.resignedDate?fmtDate(node.resignedDate):'','AUTO REMOVE DATE':ard,'TEAM NAME':teamName,'TEAM LEADER':fmtPerson(tl),'LINE MANAGER':fmtPerson(lm)};
     });
     const wsR=XLSX.utils.aoa_to_sheet([
       ['NOTE: These people are marked as resigned. Review and remove from the Perigee system if not already done.'],
       [''],
       ...XLSX.utils.sheet_to_json(XLSX.utils.json_to_sheet(resignedData),{header:1}),
     ]);
-    wsR['!cols']=[{wch:34},{wch:16},{wch:16},{wch:14},{wch:28},{wch:38},{wch:38}];
+    wsR['!cols']=[{wch:34},{wch:16},{wch:16},{wch:14},{wch:16},{wch:28},{wch:38},{wch:38}];
     XLSX.utils.book_append_sheet(wb,wsR,'Resigned Staff');
   }
   const ws3=XLSX.utils.aoa_to_sheet(buildSummarySheet());
