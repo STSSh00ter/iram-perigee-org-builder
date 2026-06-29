@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>iRam – Perigee Org Builder</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧩</text></svg>">
 <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -2796,6 +2797,16 @@ function disconnectSupa(){
   renderSyncTab();toast('Disconnected','info');
 }
 
+function autoSelectRoot(){
+  if(selectedNodeId)return;
+  const root=getRoots()[0];if(!root)return;
+  setTimeout(()=>{
+    selectNode(root.id);
+    const el=document.querySelector(`[data-node="${root.id}"]`);
+    if(el)el.scrollIntoView({behavior:'smooth',block:'center',inline:'center'});
+  },150);
+}
+
 // ─── INIT ───────────────────────────────────────────────────────────────────
 applyEditLevel();
 loadState();
@@ -2804,10 +2815,11 @@ document.body.classList.toggle('compact-view',compactView);
 if(orgNodes.length===0){orgNodes=getInitialOrg();saveState();}
 recalcMemberTeams();
 render();
+autoSelectRoot();
 if(initSupabase()){
   Promise.all([loadFromCloud(),loadPerigeeFromCloud(),loadCycleFromCloud()]).then(([treeOk,perigeeOk,cycleOk])=>{
     if(perigeeOk)recalcPerigeeFlags(orgNodes);
-    if(treeOk||perigeeOk)render();
+    if(treeOk||perigeeOk){render();autoSelectRoot();}
     subscribeRealtime();
   });
 }
