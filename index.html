@@ -1222,9 +1222,9 @@ function buildFormHTML(node,pfx){
   const puName=pu?`${pu.firstName||''} ${pu.lastName||''}`.trim():'';
   const nameMismatchShow=perigeeUsers.length>0&&!!pu&&!nameMatchesPu(node,pu);
   const updSubject=encodeURIComponent(`Perigee User Info Update – ${node.email}`);
-  const updEmailBody=encodeURIComponent(`Hi Laurette,\n\nPlease update the name for the following Perigee user:\n\nEmail (username — cannot change): ${node.email||'—'}\nName in Perigee currently: ${puName||'—'}\nCorrect name (from tree/HR): ${nipName}\n\nNote: Email addresses are used as usernames and cannot be changed via this process. To change an email the user must be removed and re-added by HR.\n\nKindly confirm once updated.\n\nRegards,\niRam`);
-  const updEmailHref=`mailto:${getNipEmail()}?cc=HR@iram.co.za&subject=${updSubject}&body=${updEmailBody}`;
-  const updWaHref=`https://wa.me/${getNipWa()}?text=${encodeURIComponent(`Hi Laurette\n\nName update needed for Perigee user:\n\nEmail: ${node.email||'-'}\nName in Perigee: ${puName||'-'}\nCorrect name: ${nipName}\n\nPlease update. Note: email/username cannot be changed.\n\nThank you!`)}`;
+  const updEmailBody=encodeURIComponent(`Hi Laurette,\n\nPlease update the name for the following Perigee user:\n\nEmail: ${node.email||'—'}\nName in Perigee currently: ${puName||'—'}\nCorrect name (from tree/HR): ${nipName}\n\nKindly confirm once updated.\n\nRegards,\niRam`);
+  const updEmailHref=`mailto:${getNipEmail()}?subject=${updSubject}&body=${updEmailBody}`;
+  const updWaHref=`https://wa.me/${getNipWa()}?text=${encodeURIComponent(`Hi Laurette\n\nName update needed for Perigee user:\n\nEmail: ${node.email||'-'}\nName in Perigee: ${puName||'-'}\nCorrect name: ${nipName}\n\nPlease update.\n\nThank you!`)}`;
   return`
     <div class="section-div">Role &amp; Team</div>
     <div class="fg"><label class="fl">Role Type *</label>
