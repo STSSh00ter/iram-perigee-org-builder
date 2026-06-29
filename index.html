@@ -1171,7 +1171,9 @@ function buildFormHTML(node,pfx){
   const nipSubject=encodeURIComponent(`Perigee User Activation Request – ${nipName}`);
   const nipEmailBody=encodeURIComponent(`Hi Laurette,\n\nPlease add the following person to the Perigee system so they can be included in the IRAM call cycle upload.\n\nName: ${nipName}\nEmail: ${node.email||'—'}\nJob Title: ${node.jobTitle||'—'}\nTeam: ${node.teamName||'—'}\nRole: ${getRoleInfo(node.roleType).label}\nProvince(s): ${node.assignedProvinces||'—'}\nReports To: ${nipLmName}\nManager Email: ${nipLmEmail}\n\nKindly confirm once the account has been activated.\n\nRegards,\niRam`);
   const nipEmailHref=`mailto:${NIP_EMAIL}?cc=HR@iram.co.za&subject=${nipSubject}&body=${nipEmailBody}`;
-  const nipWaHref=`https://wa.me/${NIP_WA}?text=${encodeURIComponent(`Hi Laurette\n\nPlease add the following person to Perigee:\n\nName: ${nipName}\nEmail: ${node.email||'-'}\nJob Title: ${node.jobTitle||'-'}\nTeam: ${node.teamName||'-'}\nProvince(s): ${node.assignedProvinces||'-'}\nReports To: ${nipLmName} (${nipLmEmail})\n\nThank you!`)}`;
+  const waEmail=(node.email||'-').replace('@',' [at] ');
+  const waLmEmail=nipLmEmail.replace('@',' [at] ');
+  const nipWaHref=`https://wa.me/${NIP_WA}?text=${encodeURIComponent(`Hi Laurette\n\nPlease add the following person to Perigee:\n\nName: ${nipName}\nEmail: ${waEmail}\nJob Title: ${node.jobTitle||'-'}\nTeam: ${node.teamName||'-'}\nProvince(s): ${node.assignedProvinces||'-'}\nReports To: ${nipLmName} (${waLmEmail})\n\nThank you!`)}`;
   return`
     <div class="section-div">Role &amp; Team</div>
     <div class="fg"><label class="fl">Role Type *</label>
