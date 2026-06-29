@@ -347,6 +347,13 @@ body.viewer-mode .node-add-btn,
 body.viewer-mode .node-addgrp-btn,
 body.viewer-mode .node-shift{display:none!important}
 body.viewer-mode .node-card{cursor:default}
+/* Viewer mode — lock edit-panel form fields */
+body.viewer-mode #epBody input.fc,
+body.viewer-mode #epBody textarea.fc{pointer-events:none;background:#f8fafc;border-color:#e9ecef;color:#1e293b;cursor:default}
+body.viewer-mode #epBody select.fc{pointer-events:none;background:#f8fafc;border-color:#e9ecef;color:#1e293b;cursor:default;-webkit-appearance:none;appearance:none}
+body.viewer-mode #epBody .prov-chip{pointer-events:none;opacity:.7}
+body.viewer-mode #epBody .ac-list{display:none!important}
+.viewer-lock-strip{display:flex;align-items:center;gap:7px;background:#fef9c3;border:1px solid #fde68a;border-radius:7px;padding:8px 11px;font-size:11px;color:#92400e;font-weight:600;margin-bottom:12px;user-select:none}
 @media print{
   .zoom-controls{display:none!important}
   *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -1270,7 +1277,8 @@ function buildFormHTML(node,pfx){
   const updEmailBody=encodeURIComponent(`Hi Laurette,\n\nPlease update the name for the following Perigee user:\n\nEmail: ${node.email||'—'}\nName in Perigee currently: ${puName||'—'}\nCorrect name (from tree/HR): ${nipName}\n\nKindly confirm once updated.\n\nRegards,\niRam`);
   const updEmailHref=`mailto:${getNipEmail()}?subject=${updSubject}&body=${updEmailBody}`;
   const updWaHref=`https://wa.me/${getNipWa()}?text=${encodeURIComponent(`Hi Laurette\n\nName update needed for Perigee user:\n\nEmail: ${node.email||'-'}\nName in Perigee: ${puName||'-'}\nCorrect name: ${nipName}\n\nPlease update.\n\nThank you!`)}`;
-  return`
+  const viewerBanner=!isEditor()?`<div class="viewer-lock-strip">🔒 View only — unlock editing to make changes</div>`:'';
+  return`${viewerBanner}
     <div class="section-div">Role &amp; Team</div>
     <div class="fg"><label class="fl">Role Type *</label>
       <select id="${pfx}roleType" class="fc" onchange="onRoleChange('${pfx}')">${roleOpts}</select>
@@ -1874,9 +1882,12 @@ function exportExcel(){
   });
   const wb=XLSX.utils.book_new();
   const cw=[{wch:10},{wch:34},{wch:16},{wch:16},{wch:18},{wch:14},{wch:22},{wch:10},{wch:14},{wch:12},{wch:14},{wch:12},{wch:28},{wch:38},{wch:38},{wch:38},{wch:28},{wch:14},{wch:8},{wch:16},{wch:14}];
-  const perigeeRows=rows.filter(r=>r.STATUS!=='NOT IN PERIGEE');
-  const nipRows=rows.filter(r=>r.STATUS==='NOT IN PERIGEE');
-  const ws1=XLSX.utils.json_to_sheet(perigeeRows.length?perigeeRows:rows);
+  const resignedEmails=new Set(orgNodes.filter(n=>n.resigned&&n.roleType!=='TEAM_GROUP').map(n=>n.email));
+  const resignedRows=rows.filter(r=>resignedEmails.has(r['USER EMAIL']));
+  const activeRows=rows.filter(r=>!resignedEmails.has(r['USER EMAIL']));
+  const perigeeRows=activeRows.filter(r=>r.STATUS!=='NOT IN PERIGEE');
+  const nipRows=activeRows.filter(r=>r.STATUS==='NOT IN PERIGEE');
+  const ws1=XLSX.utils.json_to_sheet(perigeeRows.length?perigeeRows:activeRows);
   ws1['!cols']=cw;XLSX.utils.book_append_sheet(wb,ws1,'Teams And User Cycle');
   if(nipRows.length){
     const hrContact='Email: '+getHrEmail()+(getHrWaDisplay()?'   WhatsApp: '+getHrWaDisplay():'');
@@ -1888,7 +1899,7 @@ function exportExcel(){
     ws2['!cols']=cw;
     XLSX.utils.book_append_sheet(wb,ws2,'Pending Perigee Activation');
   }
-  const mismatchNodes=orgNodes.filter(n=>n.nameMismatch&&n.roleType!=='TEAM_GROUP');
+  const mismatchNodes=orgNodes.filter(n=>n.nameMismatch&&n.roleType!=='TEAM_GROUP'&&!n.resigned);
   if(mismatchNodes.length){
     const mismatchData=mismatchNodes.map(node=>{
       const pu=findPerigeeUser(node.email);
@@ -1906,12 +1917,21 @@ function exportExcel(){
     ws4['!cols']=[{wch:34},{wch:26},{wch:26},{wch:28},{wch:38}];
     XLSX.utils.book_append_sheet(wb,ws4,'Perigee Name Updates');
   }
+  if(resignedRows.length){
+    const wsR=XLSX.utils.aoa_to_sheet([
+      ['NOTE: These people are marked as resigned. Review and remove from the Perigee system if not already done.'],
+      [''],
+      ...XLSX.utils.sheet_to_json(XLSX.utils.json_to_sheet(resignedRows),{header:1}),
+    ]);
+    wsR['!cols']=cw;
+    XLSX.utils.book_append_sheet(wb,wsR,'Resigned Staff');
+  }
   const ws3=XLSX.utils.aoa_to_sheet(buildSummarySheet());
   ws3['!cols']=[{wch:6},{wch:30},{wch:34},{wch:22},{wch:16},{wch:30}];
   XLSX.utils.book_append_sheet(wb,ws3,'Org Summary');
   const date=new Date().toISOString().slice(0,10);
   XLSX.writeFile(wb,`iRam-Perigee-OrgExport-${date}.xlsx`);
-  toast(`Exported ${rows.length} rows · ${nipRows.length} pending activation · ${mismatchNodes.length} name updates ✓`,'success');
+  toast(`Exported ${activeRows.length} active · ${resignedRows.length} resigned · ${nipRows.length} pending activation · ${mismatchNodes.length} name updates ✓`,'success');
 }
 function buildSummarySheet(){
   const rows=[['Level','Full Name','Email','Job Title','Role Type','Team(s)']];
