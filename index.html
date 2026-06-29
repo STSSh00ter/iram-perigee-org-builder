@@ -1870,8 +1870,6 @@ function exportExcel(){
       'STATUS':pu?pu.status:(node.notInPerigee?'NOT IN PERIGEE':'ACTIVE'),
       'ASSIGNED PROVINCES':node.assignedProvinces,
       'JOB TITLE':node.jobTitle,
-      'RESIGNED':node.resigned?'YES':'',
-      'RESIGNED DATE':node.resigned&&node.resignedDate?fmtDate(node.resignedDate):'',
       'LEAVE TYPE':isActiveLeave(node)?node.leaveType:'',
       'LEAVE START':isActiveLeave(node)&&node.leaveStart?fmtDate(node.leaveStart):'',
       'LEAVE END':isActiveLeave(node)&&node.leaveEnd?fmtDate(node.leaveEnd):'',
@@ -1885,9 +1883,8 @@ function exportExcel(){
     });
   });
   const wb=XLSX.utils.book_new();
-  const cw=[{wch:10},{wch:34},{wch:16},{wch:16},{wch:18},{wch:14},{wch:22},{wch:10},{wch:14},{wch:12},{wch:14},{wch:12},{wch:28},{wch:38},{wch:38},{wch:38},{wch:28},{wch:14},{wch:8},{wch:16},{wch:14}];
+  const cw=[{wch:10},{wch:34},{wch:16},{wch:16},{wch:18},{wch:14},{wch:22},{wch:12},{wch:14},{wch:12},{wch:28},{wch:38},{wch:38},{wch:38},{wch:28},{wch:14},{wch:8},{wch:8},{wch:16},{wch:14}];
   const resignedEmails=new Set(orgNodes.filter(n=>n.resigned&&n.roleType!=='TEAM_GROUP').map(n=>n.email));
-  const resignedRows=rows.filter(r=>resignedEmails.has(r['USER EMAIL']));
   const activeRows=rows.filter(r=>!resignedEmails.has(r['USER EMAIL']));
   const perigeeRows=activeRows.filter(r=>r.STATUS!=='NOT IN PERIGEE');
   const nipRows=activeRows.filter(r=>r.STATUS==='NOT IN PERIGEE');
@@ -1921,13 +1918,19 @@ function exportExcel(){
     ws4['!cols']=[{wch:34},{wch:26},{wch:26},{wch:28},{wch:38}];
     XLSX.utils.book_append_sheet(wb,ws4,'Perigee Name Updates');
   }
-  if(resignedRows.length){
+  const resignedNodes=orgNodes.filter(n=>n.resigned&&n.roleType!=='TEAM_GROUP');
+  if(resignedNodes.length){
+    const resignedData=resignedNodes.map(node=>{
+      const{teamName,tl}=getMembershipInfo(node.id);
+      const lm=getDirectManager(node.id);
+      return{'USER EMAIL':node.email,'FIRST NAME':node.firstName,'SURNAME':node.lastName,'RESIGNED DATE':node.resignedDate?fmtDate(node.resignedDate):'','TEAM NAME':teamName,'TEAM LEADER':fmtPerson(tl),'LINE MANAGER':fmtPerson(lm)};
+    });
     const wsR=XLSX.utils.aoa_to_sheet([
       ['NOTE: These people are marked as resigned. Review and remove from the Perigee system if not already done.'],
       [''],
-      ...XLSX.utils.sheet_to_json(XLSX.utils.json_to_sheet(resignedRows),{header:1}),
+      ...XLSX.utils.sheet_to_json(XLSX.utils.json_to_sheet(resignedData),{header:1}),
     ]);
-    wsR['!cols']=cw;
+    wsR['!cols']=[{wch:34},{wch:16},{wch:16},{wch:14},{wch:28},{wch:38},{wch:38}];
     XLSX.utils.book_append_sheet(wb,wsR,'Resigned Staff');
   }
   const ws3=XLSX.utils.aoa_to_sheet(buildSummarySheet());
@@ -1935,7 +1938,7 @@ function exportExcel(){
   XLSX.utils.book_append_sheet(wb,ws3,'Org Summary');
   const date=new Date().toISOString().slice(0,10);
   XLSX.writeFile(wb,`iRam-Perigee-OrgExport-${date}.xlsx`);
-  toast(`Exported ${activeRows.length} active · ${resignedRows.length} resigned · ${nipRows.length} pending activation · ${mismatchNodes.length} name updates ✓`,'success');
+  toast(`Exported ${activeRows.length} active · ${resignedNodes.length} resigned · ${nipRows.length} pending activation · ${mismatchNodes.length} name updates ✓`,'success');
 }
 function buildSummarySheet(){
   const rows=[['Level','Full Name','Email','Job Title','Role Type','Team(s)']];
