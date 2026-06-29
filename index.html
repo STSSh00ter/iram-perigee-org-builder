@@ -238,17 +238,24 @@ ul.grp-children::before{border-left-style:dashed!important;border-color:#94a3b8!
 .conflict-note{background:#fef3c7;border:1px solid #f59e0b;border-radius:6px;padding:7px 10px;font-size:10px;color:#78350f;margin-bottom:8px}
 .conflict-note b{display:block;margin-bottom:2px}
 /* Admin panel */
-.admin-tabs{display:flex;border-bottom:2px solid #e2e8f0;margin:-18px -24px 18px;padding:0 24px;gap:2px}
-.admin-tab{padding:12px 20px;border:none;background:none;font-size:13px;font-weight:700;color:#64748b;cursor:pointer;border-bottom:3px solid transparent;transition:.15s;white-space:nowrap}
-.admin-tab:hover{color:#1e293b;background:#f8fafc}
-.admin-tab.active{color:#2563eb;border-bottom-color:#2563eb;background:#eff6ff}
-.admin-content{max-height:65vh;overflow-y:auto}
+.admin-tabs{display:flex;border-bottom:2px solid #e2e8f0;margin:0 0 0;padding:0;gap:0;background:#f8fafc}
+.admin-tab{padding:14px 22px;border:none;border-bottom:3px solid transparent;background:none;font-size:12.5px;font-weight:700;color:#64748b;cursor:pointer;transition:.15s;white-space:nowrap;flex:1;text-align:center}
+.admin-tab:hover{color:#1e293b;background:#f1f5f9}
+.admin-tab.active{color:#2563eb;border-bottom-color:#2563eb;background:#fff}
+.admin-content{height:62vh;overflow-y:auto;padding:24px}
 .admin-table{width:100%;font-size:12.5px;border-collapse:collapse}
 .admin-table thead tr{background:#f8fafc;position:sticky;top:0;z-index:2}
-.admin-table th{padding:9px 12px;text-align:left;border-bottom:2px solid #e2e8f0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#64748b;white-space:nowrap}
-.admin-table td{padding:7px 12px;border-bottom:1px solid #f1f5f9;vertical-align:middle}
+.admin-table th{padding:10px 14px;text-align:left;border-bottom:2px solid #e2e8f0;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#64748b;white-space:nowrap}
+.admin-table td{padding:9px 14px;border-bottom:1px solid #f1f5f9;vertical-align:middle;font-size:12.5px}
 .admin-table tbody tr:hover{background:#f8fafc}
-.audit-badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:9.5px;font-weight:800;color:#fff;letter-spacing:.04em}
+.audit-badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:9.5px;font-weight:800;color:#fff;letter-spacing:.05em}
+.admin-card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:18px 20px}
+.admin-card-title{font-size:13px;font-weight:800;color:#1e293b;margin-bottom:6px}
+.admin-card-desc{font-size:11.5px;color:#64748b;line-height:1.6;margin-bottom:14px}
+.admin-section-label{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:#94a3b8;margin-bottom:10px}
+.admin-status-pill{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:20px;font-size:12px;font-weight:700;margin-bottom:18px}
+.admin-status-pill.connected{background:#dcfce7;color:#15803d}
+.admin-status-pill.disconnected{background:#fee2e2;color:#b91c1c}
 /* Delete confirmation */
 .del-info{background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px 14px;margin-bottom:12px}
 .del-info-title{font-weight:800;color:#991b1b;font-size:12px;margin-bottom:5px}
@@ -435,12 +442,15 @@ body.viewer-mode .node-card{cursor:default}
 </div>
 <!-- Admin panel modal -->
 <div class="overlay" id="adminModal">
-  <div class="modal" style="width:920px;max-width:97vw">
-    <div class="modal-hdr" style="display:flex;justify-content:space-between;align-items:center;padding:18px 24px 14px">
-      <div><h3 style="margin:0;font-size:16px">🔒 Admin Panel</h3><p id="adminDeviceLabel" style="margin:3px 0 0;font-size:11px;color:#94a3b8;font-family:monospace">Device ID: loading…</p></div>
-      <button class="btn btn-ghost btn-sm" onclick="closeAdmin()">✕ Close</button>
+  <div class="modal" style="width:960px;max-width:97vw;max-height:92vh">
+    <div class="modal-hdr" style="display:flex;justify-content:space-between;align-items:center;padding:16px 24px">
+      <div>
+        <h3 style="margin:0;font-size:16px;font-weight:800">⚙ Admin Panel</h3>
+        <p id="adminDeviceLabel" style="margin:3px 0 0;font-size:10.5px;opacity:.65;font-family:monospace">Device ID: loading…</p>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="closeAdmin()" style="font-size:13px">✕ Close</button>
     </div>
-    <div class="modal-body" style="padding:0 24px 20px">
+    <div style="padding:0;overflow:hidden;flex:1;display:flex;flex-direction:column">
       <div class="admin-tabs">
         <button id="adminTabLog" class="admin-tab active" onclick="switchAdminTab('log')">📋 Audit Log</button>
         <button id="adminTabTrash" class="admin-tab" onclick="switchAdminTab('trash')">🗑 Deleted Items</button>
@@ -1815,17 +1825,20 @@ function switchAdminTab(tab){
     const rows=log.slice().reverse().slice(0,300);
     const actionColor={ADD:'#059669',UPDATE:'#2563eb',DELETE:'#dc2626',RESTORE:'#7c3aed',HARD_DELETE:'#991b1b'};
     document.getElementById('adminContent').innerHTML=`
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-        <span style="font-size:12px;color:#64748b;font-weight:600">${log.length} total entries</span>
-        <button class="btn btn-sm" style="background:#f1f5f9;color:#64748b;font-size:12px;gap:5px" onclick="clearAuditLog()">🗑 Clear Log</button>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+        <div>
+          <div style="font-size:14px;font-weight:800;color:#1e293b;margin-bottom:2px">Audit Log</div>
+          <div style="font-size:11.5px;color:#64748b">${log.length} total entries — showing latest 300</div>
+        </div>
+        <button class="btn btn-sm" style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca" onclick="clearAuditLog()">🗑 Clear Log</button>
       </div>
       <table class="admin-table">
         <thead><tr>
-          <th>Action</th>
+          <th style="width:110px">Action</th>
           <th>Person</th>
           <th>Team</th>
-          <th>When</th>
-          <th>Device</th>
+          <th style="width:160px">When</th>
+          <th style="width:140px">Device</th>
         </tr></thead>
         <tbody>${rows.map(e=>`<tr>
           <td><span class="audit-badge" style="background:${actionColor[e.action]||'#94a3b8'}">${e.action}</span></td>
@@ -1834,22 +1847,27 @@ function switchAdminTab(tab){
           <td style="color:#94a3b8;white-space:nowrap;font-size:11.5px">${new Date(e.timestamp).toLocaleString()}</td>
           <td style="color:#94a3b8;font-size:11px;font-family:monospace">${(e.deviceId||'').slice(0,18)}</td>
         </tr>`).join('')}
-        ${rows.length===0?'<tr><td colspan="5" style="padding:40px;text-align:center;color:#94a3b8;font-size:13px">No audit entries yet</td></tr>':''}
+        ${rows.length===0?'<tr><td colspan="5" style="padding:60px;text-align:center;color:#94a3b8;font-size:13px">📋 No audit entries yet</td></tr>':''}
         </tbody></table>`;
   } else {
     document.getElementById('adminContent').innerHTML=`
-      <div style="font-size:11px;color:#64748b;margin-bottom:10px">${trash.length} item(s) in trash</div>
-      ${trash.length===0?'<div style="text-align:center;padding:40px;color:#94a3b8;font-size:13px">🗑 Trash is empty</div>':
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+        <div>
+          <div style="font-size:14px;font-weight:800;color:#1e293b;margin-bottom:2px">Deleted Items</div>
+          <div style="font-size:11.5px;color:#64748b">${trash.length} item(s) in trash — restore or permanently delete</div>
+        </div>
+      </div>
+      ${trash.length===0?'<div style="text-align:center;padding:60px 20px;color:#94a3b8;font-size:13px">🗑 Trash is empty</div>':
       trash.slice().reverse().map(n=>`
-        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:12px;box-shadow:0 1px 4px rgba(0,0,0,.06)">
           <div style="flex:1;min-width:0">
-            <div style="font-weight:700;font-size:12px;color:#1e293b">${(n.firstName+' '+n.lastName).trim()||n.email||'(unnamed)'}</div>
-            <div style="font-size:10px;color:#64748b;margin-top:2px">${n.email||'—'} · ${n.teamName||'—'} · ${getRoleInfo(n.roleType).label}</div>
-            <div style="font-size:10px;color:#94a3b8;margin-top:1px">Deleted: ${new Date(n._deletedAt).toLocaleString()} · By: ${(n._deletedBy||'').slice(0,20)}</div>
+            <div style="font-weight:800;font-size:13px;color:#1e293b;margin-bottom:3px">${(n.firstName+' '+n.lastName).trim()||n.email||'(unnamed)'}</div>
+            <div style="font-size:11.5px;color:#64748b;margin-bottom:2px">${n.email||'—'} &nbsp;·&nbsp; ${n.teamName||'—'} &nbsp;·&nbsp; ${getRoleInfo(n.roleType).label}</div>
+            <div style="font-size:10.5px;color:#94a3b8">Deleted ${new Date(n._deletedAt).toLocaleString()} &nbsp;·&nbsp; by ${(n._deletedBy||'unknown').slice(0,24)}</div>
           </div>
-          <div style="display:flex;gap:5px;flex-shrink:0">
-            <button class="btn btn-sm" style="background:#059669;color:#fff;font-size:10px" onclick="restoreFromTrash('${n.id}')">↩ Restore</button>
-            <button class="btn btn-danger btn-sm" style="font-size:10px" onclick="hardDelete('${n.id}')">✕ Perm. Delete</button>
+          <div style="display:flex;gap:8px;flex-shrink:0">
+            <button class="btn btn-sm" style="background:#059669;color:#fff" onclick="restoreFromTrash('${n.id}')">↩ Restore</button>
+            <button class="btn btn-danger btn-sm" onclick="hardDelete('${n.id}')">✕ Delete forever</button>
           </div>
         </div>`).join('')}`;
   }
@@ -2170,16 +2188,22 @@ function subscribeRealtime(){
 function renderDataTab(){
   const tSet=new Set(orgNodes.flatMap(n=>[n.teamName,...(n.extraTeams||[])]).filter(Boolean));
   document.getElementById('adminContent').innerHTML=`
-    <div style="display:flex;flex-direction:column;gap:18px">
-      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px 14px">
-        <div style="font-size:13px;font-weight:700;margin-bottom:6px">📥 Import Tree</div>
-        <p style="font-size:11px;color:#64748b;margin-bottom:10px;line-height:1.5">Load a tree from a shared <b>.json</b> export file. This replaces the current tree (a backup of the current tree is saved to Deleted Items first).</p>
-        <button class="btn btn-sm" style="background:#2563eb;color:#fff" onclick="closeAdmin();importState()">📥 Choose file & import…</button>
+    <div style="margin-bottom:20px">
+      <div style="font-size:14px;font-weight:800;color:#1e293b;margin-bottom:4px">Data Management</div>
+      <div style="font-size:11.5px;color:#64748b">Import or reset the org tree. Perigee user data is not affected.</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div class="admin-card">
+        <div style="font-size:22px;margin-bottom:10px">📥</div>
+        <div class="admin-card-title">Import Tree</div>
+        <div class="admin-card-desc">Load a tree from a <b>.json</b> export file. Your current tree is automatically backed up to Deleted Items before anything is replaced.</div>
+        <button class="btn btn-sm" style="background:#2563eb;color:#fff;width:100%;justify-content:center" onclick="closeAdmin();importState()">📥 Choose file & import…</button>
       </div>
-      <div style="background:#fff7ed;border:1px solid #fb923c;border-radius:8px;padding:12px 14px">
-        <div style="font-size:13px;font-weight:700;margin-bottom:6px;color:#9a3412">🗑 Clear All</div>
-        <p style="font-size:11px;color:#7c2d12;margin-bottom:10px;line-height:1.5">Removes <b>all ${orgNodes.length} node(s)</b> across <b>${tSet.size} team(s)</b> from the tree. Nodes are soft-deleted and recoverable from <b>Deleted Items</b>. This does not delete Perigee users.</p>
-        <button class="btn btn-sm btn-warning" onclick="closeAdmin();clearAll()">🗑 Clear entire tree…</button>
+      <div class="admin-card" style="border-color:#fecaca;background:#fef2f2">
+        <div style="font-size:22px;margin-bottom:10px">🗑</div>
+        <div class="admin-card-title" style="color:#991b1b">Clear All Nodes</div>
+        <div class="admin-card-desc" style="color:#7c2d12">Removes all <b>${orgNodes.length} nodes</b> across <b>${tSet.size} teams</b>. All nodes are soft-deleted and can be recovered from <b>Deleted Items</b>.</div>
+        <button class="btn btn-sm btn-danger" style="width:100%;justify-content:center" onclick="closeAdmin();clearAll()">🗑 Clear entire tree…</button>
       </div>
     </div>`;
 }
@@ -2188,42 +2212,56 @@ function renderSyncTab(){
   const cfg=getSupaCfg()||{};
   const connected=!!_supa;
   document.getElementById('adminContent').innerHTML=`
-    <div style="margin-bottom:16px">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-        <span style="font-size:20px">${connected?'🟢':'🔴'}</span>
-        <span style="font-weight:700;font-size:13px">${connected?'Connected to Supabase':'Not connected'}</span>
-        ${connected?`<button class="btn btn-sm" style="background:#059669;color:#fff;margin-left:auto" onclick="manualSync()">↻ Pull latest</button>`:''}
+    <div style="font-size:14px;font-weight:800;color:#1e293b;margin-bottom:4px">Cloud Sync</div>
+    <div style="font-size:11.5px;color:#64748b;margin-bottom:20px">Real-time sync across all devices via Supabase. Changes push automatically when connected.</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start">
+      <div>
+        <div class="admin-section-label">Connection Status</div>
+        <div class="admin-status-pill ${connected?'connected':'disconnected'}">
+          <span style="font-size:16px">${connected?'🟢':'🔴'}</span>
+          ${connected?'Connected to Supabase':'Not connected'}
+        </div>
+        <div class="admin-card" style="${connected?'border-color:#bbf7d0;background:#f0fdf4':''}">
+          <div class="admin-section-label">Supabase Credentials</div>
+          <div class="fg"><label class="fl">Project URL</label>
+            <input id="supaUrl" class="fc" placeholder="https://xxxx.supabase.co" value="${cfg.url||''}">
+          </div>
+          <div class="fg" style="margin-bottom:16px"><label class="fl">Anon / Public Key</label>
+            <input id="supaKey" class="fc" placeholder="eyJhbGci…" value="${cfg.anonKey||''}">
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px">
+            <button class="btn btn-primary btn-sm" onclick="saveAndConnectSupa()">💾 Save & Connect</button>
+            ${connected?`<button class="btn btn-sm" style="background:#059669;color:#fff" onclick="pushToCloud()">☁ Push tree to cloud</button>`:''}
+            ${connected?`<button class="btn btn-sm" style="background:#0ea5e9;color:#fff" onclick="manualSync()">↻ Pull latest</button>`:''}
+            ${cfg.url?`<button class="btn btn-sm" style="background:#f1f5f9;color:#64748b" onclick="disconnectSupa()">Disconnect</button>`:''}
+          </div>
+        </div>
       </div>
-      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px;margin-bottom:14px">
-        <div style="font-weight:700;font-size:11px;color:#374151;margin-bottom:8px">SUPABASE SETUP (one-time)</div>
-        <ol style="font-size:11px;color:#64748b;line-height:2;padding-left:16px">
-          <li>Go to <b>supabase.com</b> → New project (free)</li>
-          <li>Open <b>SQL Editor</b> and run:<br>
-            <code style="display:block;background:#1e293b;color:#7dd3fc;padding:8px;border-radius:4px;font-size:10px;margin:4px 0;white-space:pre">CREATE TABLE iram_org_state (
+      <div>
+        <div class="admin-section-label">First-time Setup Guide</div>
+        <div class="admin-card" style="font-size:11.5px;color:#64748b;line-height:1.7">
+          <ol style="padding-left:18px;margin:0">
+            <li style="margin-bottom:8px">Go to <b style="color:#1e293b">supabase.com</b> → create a free project</li>
+            <li style="margin-bottom:8px">Open <b style="color:#1e293b">SQL Editor</b> and run this once:</li>
+          </ol>
+          <code style="display:block;background:#1e293b;color:#7dd3fc;padding:12px 14px;border-radius:8px;font-size:10px;line-height:1.7;margin:10px 0;white-space:pre">CREATE TABLE iram_org_state (
   id text PRIMARY KEY,
   nodes jsonb DEFAULT '[]',
   updated_at timestamptz DEFAULT now(),
   updated_by text
 );
-INSERT INTO iram_org_state VALUES ('main','[]',now(),'setup');
-ALTER TABLE iram_org_state ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "allow_all" ON iram_org_state
-  FOR ALL USING (true) WITH CHECK (true);</code>
-          </li>
-          <li>Go to <b>Settings → API</b></li>
-          <li>Copy <b>Project URL</b> and <b>anon/public key</b> below</li>
-        </ol>
-      </div>
-      <div class="fg"><label class="fl">Supabase Project URL</label>
-        <input id="supaUrl" class="fc" placeholder="https://xxxx.supabase.co" value="${cfg.url||''}">
-      </div>
-      <div class="fg"><label class="fl">Supabase Anon Key (public)</label>
-        <input id="supaKey" class="fc" placeholder="eyJhbGci…" value="${cfg.anonKey||''}">
-      </div>
-      <div style="display:flex;gap:8px;margin-top:4px">
-        <button class="btn btn-primary btn-sm" onclick="saveAndConnectSupa()">💾 Save & Connect</button>
-        ${connected?`<button class="btn btn-sm" style="background:#059669;color:#fff" onclick="pushToCloud()">☁ Push my tree to cloud</button>`:''}
-        ${cfg.url?`<button class="btn btn-sm" style="background:#f1f5f9;color:#64748b" onclick="disconnectSupa()">Disconnect</button>`:''}
+INSERT INTO iram_org_state
+  VALUES ('main','[]',now(),'setup');
+ALTER TABLE iram_org_state
+  ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "allow_all"
+  ON iram_org_state FOR ALL
+  USING (true) WITH CHECK (true);</code>
+          <ol start="3" style="padding-left:18px;margin:0">
+            <li style="margin-bottom:4px">Go to <b style="color:#1e293b">Settings → API</b></li>
+            <li>Copy <b style="color:#1e293b">Project URL</b> and <b style="color:#1e293b">anon/public key</b> into the fields on the left</li>
+          </ol>
+        </div>
       </div>
     </div>`;
 }
