@@ -71,6 +71,14 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#eef2f7;color:#1e293b;he
 .nip-alert .nip-label{font-weight:700;width:16px;text-align:center;flex-shrink:0}
 .nip-alert .nip-val{flex:1;font-size:10px;word-break:break-all}
 .nip-alert .nip-actions{display:flex;gap:5px;flex-wrap:wrap;margin-top:2px}
+.update-alert{background:#faf5ff;border:1px solid #c4b5fd;border-radius:8px;padding:10px 12px;margin-top:6px;font-size:11px;color:#4c1d95}
+.update-alert .nip-title{font-weight:800;font-size:12px;margin-bottom:6px;color:#5b21b6}
+.update-alert .nip-row{display:flex;align-items:center;gap:6px;margin-bottom:5px}
+.update-alert .nip-val{flex:1;font-size:10px;word-break:break-all}
+.update-alert .nip-actions{display:flex;gap:5px;flex-wrap:wrap;margin-top:2px}
+.node-card.name-mismatch{border-color:#7c3aed;background:#fdf4ff}
+.node-card.name-mismatch.selected{border-color:#6d28d9;box-shadow:0 0 0 3px rgba(109,40,217,.18)}
+.update-pip{position:absolute;top:5px;right:6px;width:16px;height:16px;background:#7c3aed;border-radius:50%;font-size:9px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;box-shadow:0 1px 4px rgba(124,58,237,.5)}
 /* Org tree CSS lines */
 .org-wrap{display:flex;flex-direction:column;align-items:center;min-width:max-content}
 .org-tree{padding:0;display:table}
@@ -457,6 +465,7 @@ body.viewer-mode .node-card{cursor:default}
         <button id="adminTabCycle" class="admin-tab" onclick="switchAdminTab('cycle')">📊 Validate</button>
         <button id="adminTabSync" class="admin-tab" onclick="switchAdminTab('sync')">☁ Cloud Sync</button>
         <button id="adminTabData" class="admin-tab" onclick="switchAdminTab('data')">🗂 Data</button>
+        <button id="adminTabSettings" class="admin-tab" onclick="switchAdminTab('settings')">⚙ Settings</button>
       </div>
       <div class="admin-content" id="adminContent"></div>
     </div>
@@ -465,7 +474,9 @@ body.viewer-mode .node-card{cursor:default}
 <div class="toast-container" id="toasts"></div>
 
 <script>
-const NIP_EMAIL='laurette@outerjoin.co.za', NIP_WA='+27833532230', NIP_WA_DISPLAY='+27 83 353 2230';
+function getNipEmail(){return localStorage.getItem('iram-nip-email')||'laurette@outerjoin.co.za';}
+function getNipWa(){return localStorage.getItem('iram-nip-wa')||'+27833532230';}
+function getNipWaDisplay(){return localStorage.getItem('iram-nip-wa-display')||getNipWa();}
 const ROLE_TYPES=[
   {v:'REGIONAL_MANAGER',label:'Regional Manager',color:'role-reg',badge:'Reg. Manager'},
   {v:'CHANNEL_HEAD',label:'Channel Head',color:'role-chan',badge:'Channel Head'},
@@ -564,6 +575,17 @@ function getChildren(id){return orgNodes.filter(n=>n.parentId===id);}
 function getRoots(){return orgNodes.filter(n=>!n.parentId);}
 function getRoleInfo(v){return ROLE_TYPES.find(r=>r.v===v)||ROLE_TYPES[4];}
 function findPerigeeUser(email){return perigeeUsers.find(u=>u.email===(email||'').trim().toLowerCase());}
+function nameMatchesPu(node,pu){
+  return (node.firstName||'').trim().toLowerCase()===(pu.firstName||'').trim().toLowerCase()&&
+         (node.lastName||'').trim().toLowerCase()===(pu.lastName||'').trim().toLowerCase();
+}
+function recalcPerigeeFlags(nodeArr){
+  nodeArr.forEach(n=>{
+    const pu=perigeeUsers.length&&n.email?findPerigeeUser(n.email):null;
+    n.notInPerigee=perigeeUsers.length>0&&!!n.email&&!pu;
+    n.nameMismatch=!!pu&&!nameMatchesPu(n,pu);
+  });
+}
 function isLeaderRole(role){return LEADER_ROLES.includes(role);}
 
 let dupEmails=new Set();
@@ -703,7 +725,7 @@ function loadPerigeeFile(){
         status:r['Status']||'',access:r['Access']||'',
       })).filter(u=>u.email&&u.email.includes('@'));
       savePerigee();
-      orgNodes.forEach(n=>{n.notInPerigee=!!n.email&&!findPerigeeUser(n.email);});
+      recalcPerigeeFlags(orgNodes);
       saveState();render();
       toast(`Loaded & saved ${perigeeUsers.length} Perigee users ✓`,'success');
     }catch(err){toast('Failed to read file: '+err.message,'error');}
@@ -1106,7 +1128,9 @@ function collectFormInto(node,pfx){
       pid=p.parentId;}
     if(derived)node.teamName=derived;
   }
-  node.notInPerigee=perigeeUsers.length>0&&!!node.email&&!findPerigeeUser(node.email);
+  const _pu=findPerigeeUser(node.email);
+  node.notInPerigee=perigeeUsers.length>0&&!!node.email&&!_pu;
+  node.nameMismatch=!!_pu&&!nameMatchesPu(node,_pu);
   // Leave fields
   node.leaveType=(document.getElementById(pfx+'leaveType')?.value||'');
   node.leaveStart=(document.getElementById(pfx+'leaveStart')?.value||'');
@@ -1169,10 +1193,18 @@ function buildFormHTML(node,pfx){
   const nipLm=getDirectManager(node.id);
   const nipLmName=nipLm?((nipLm.firstName+' '+nipLm.lastName).trim()||nipLm.email||'—'):'—';
   const nipLmEmail=nipLm?(nipLm.email||'—'):'—';
+  // NIP (email not found) — Add new user
   const nipSubject=encodeURIComponent(`Perigee User Activation Request – ${nipName}`);
   const nipEmailBody=encodeURIComponent(`Hi Laurette,\n\nPlease add the following person to the Perigee system so they can be included in the IRAM call cycle upload.\n\nName: ${nipName}\nEmail: ${node.email||'—'}\nJob Title: ${node.jobTitle||'—'}\nTeam: ${node.teamName||'—'}\nRole: ${getRoleInfo(node.roleType).label}\nProvince(s): ${node.assignedProvinces||'—'}\nReports To: ${nipLmName}\nManager Email: ${nipLmEmail}\n\nKindly confirm once the account has been activated.\n\nRegards,\niRam`);
-  const nipEmailHref=`mailto:${NIP_EMAIL}?cc=HR@iram.co.za&subject=${nipSubject}&body=${nipEmailBody}`;
-  const nipWaHref=`https://wa.me/${NIP_WA}?text=${encodeURIComponent(`Hi Laurette\n\nPlease add the following person to Perigee:\n\nName: ${nipName}\nEmail: ${node.email||'-'}\nJob Title: ${node.jobTitle||'-'}\nTeam: ${node.teamName||'-'}\nProvince(s): ${node.assignedProvinces||'-'}\nReports To: ${nipLmName} (${nipLmEmail})\n\nThank you!`)}`;
+  const nipEmailHref=`mailto:${getNipEmail()}?cc=HR@iram.co.za&subject=${nipSubject}&body=${nipEmailBody}`;
+  const nipWaHref=`https://wa.me/${getNipWa()}?text=${encodeURIComponent(`Hi Laurette\n\nPlease add the following person to Perigee:\n\nName: ${nipName}\nEmail: ${node.email||'-'}\nJob Title: ${node.jobTitle||'-'}\nTeam: ${node.teamName||'-'}\nProvince(s): ${node.assignedProvinces||'-'}\nReports To: ${nipLmName} (${nipLmEmail})\n\nThank you!`)}`;
+  // Name mismatch — Update existing user info
+  const puName=pu?`${pu.firstName||''} ${pu.lastName||''}`.trim():'';
+  const nameMismatchShow=perigeeUsers.length>0&&!!pu&&!nameMatchesPu(node,pu);
+  const updSubject=encodeURIComponent(`Perigee User Info Update – ${node.email}`);
+  const updEmailBody=encodeURIComponent(`Hi Laurette,\n\nPlease update the name for the following Perigee user:\n\nEmail (username — cannot change): ${node.email||'—'}\nName in Perigee currently: ${puName||'—'}\nCorrect name (from tree/HR): ${nipName}\n\nNote: Email addresses are used as usernames and cannot be changed via this process. To change an email the user must be removed and re-added by HR.\n\nKindly confirm once updated.\n\nRegards,\niRam`);
+  const updEmailHref=`mailto:${getNipEmail()}?cc=HR@iram.co.za&subject=${updSubject}&body=${updEmailBody}`;
+  const updWaHref=`https://wa.me/${getNipWa()}?text=${encodeURIComponent(`Hi Laurette\n\nName update needed for Perigee user:\n\nEmail: ${node.email||'-'}\nName in Perigee: ${puName||'-'}\nCorrect name: ${nipName}\n\nPlease update. Note: email/username cannot be changed.\n\nThank you!`)}`;
   return`
     <div class="section-div">Role &amp; Team</div>
     <div class="fg"><label class="fl">Role Type *</label>
@@ -1197,17 +1229,31 @@ function buildFormHTML(node,pfx){
       <div id="${pfx}emailAcList" class="ac-list"></div>
     </div>
     <div id="${pfx}nipAlert" class="nip-alert" style="display:${nipShow?'block':'none'}">
-      <div class="nip-title">⚠️ Not in Perigee system</div>
-      <div style="margin-bottom:8px;font-size:10px;line-height:1.4">This person needs to be added by Outer Join before they can be included in a call cycle upload.</div>
-      <div class="nip-row"><span class="nip-label" style="font-size:9px;font-weight:800;color:#9a3412;width:auto;padding:1px 5px;background:#fee2e2;border-radius:3px">EMAIL</span><span class="nip-val">${NIP_EMAIL} <span style="opacity:.6;font-size:9px">· cc: HR@iram.co.za</span></span></div>
+      <div class="nip-title">⚠️ Not in Perigee — contact to add</div>
+      <div style="margin-bottom:8px;font-size:10px;line-height:1.4">Email not found in Perigee. Outer Join must add this person before they can be included in a call cycle upload.</div>
+      <div class="nip-row"><span class="nip-label" style="font-size:9px;font-weight:800;color:#9a3412;width:auto;padding:1px 5px;background:#fee2e2;border-radius:3px">EMAIL</span><span class="nip-val">${getNipEmail()} <span style="opacity:.6;font-size:9px">· cc: HR@iram.co.za</span></span></div>
       <div class="nip-actions">
-        <button class="btn-copy" onclick="copyText('${NIP_EMAIL}')">Copy Email</button>
+        <button class="btn-copy" onclick="copyText('${getNipEmail()}')">Copy Email</button>
         <a href="${nipEmailHref}" class="btn-wa" style="background:#2563eb">Open Email ↗</a>
       </div>
-      <div class="nip-row" style="margin-top:6px"><span class="nip-label" style="font-size:9px;font-weight:800;color:#166534;width:auto;padding:1px 5px;background:#dcfce7;border-radius:3px">WA</span><span class="nip-val">${NIP_WA_DISPLAY}</span></div>
+      <div class="nip-row" style="margin-top:6px"><span class="nip-label" style="font-size:9px;font-weight:800;color:#166534;width:auto;padding:1px 5px;background:#dcfce7;border-radius:3px">WA</span><span class="nip-val">${getNipWaDisplay()}</span></div>
       <div class="nip-actions">
-        <button class="btn-copy" onclick="copyText('${NIP_WA_DISPLAY}')">Copy Number</button>
+        <button class="btn-copy" onclick="copyText('${getNipWaDisplay()}')">Copy Number</button>
         <a href="${nipWaHref}" target="_blank" class="btn-wa">WhatsApp ↗</a>
+      </div>
+    </div>
+    <div id="${pfx}updateAlert" class="update-alert" style="display:${nameMismatchShow?'block':'none'}">
+      <div class="nip-title">≠ Name differs from Perigee record</div>
+      <div style="margin-bottom:8px;font-size:10px;line-height:1.5;color:#4c1d95">Perigee has this user as <b>${puName||'—'}</b>. Outer Join can update the name — but email/username <b>cannot</b> be changed here. Email changes must go via HR (remove + re-add).</div>
+      <div class="nip-row"><span class="nip-label" style="font-size:9px;font-weight:800;color:#4c1d95;width:auto;padding:1px 5px;background:#ede9fe;border-radius:3px">EMAIL</span><span class="nip-val">${getNipEmail()} <span style="opacity:.6;font-size:9px">· cc: HR@iram.co.za</span></span></div>
+      <div class="nip-actions">
+        <button class="btn-copy" onclick="copyText('${getNipEmail()}')">Copy Email</button>
+        <a href="${updEmailHref}" class="btn-wa" style="background:#7c3aed">Open Email ↗</a>
+      </div>
+      <div class="nip-row" style="margin-top:6px"><span class="nip-label" style="font-size:9px;font-weight:800;color:#166534;width:auto;padding:1px 5px;background:#dcfce7;border-radius:3px">WA</span><span class="nip-val">${getNipWaDisplay()}</span></div>
+      <div class="nip-actions">
+        <button class="btn-copy" onclick="copyText('${getNipWaDisplay()}')">Copy Number</button>
+        <a href="${updWaHref}" target="_blank" class="btn-wa">WhatsApp ↗</a>
       </div>
     </div>
     <div class="fg"><label class="fl">Perigee Status</label>
@@ -1327,11 +1373,18 @@ function onEmailInput(pfx){
 function onEmailBlur(pfx){
   setTimeout(()=>{
     const email=(document.getElementById(pfx+'email').value||'').trim().toLowerCase();
-    const alertEl=document.getElementById(pfx+'nipAlert'),statusEl=document.getElementById(pfx+'status');
-    if(!alertEl||!email||!perigeeUsers.length){if(alertEl)alertEl.style.display='none';return;}
+    const alertEl=document.getElementById(pfx+'nipAlert'),statusEl=document.getElementById(pfx+'status'),updEl=document.getElementById(pfx+'updateAlert');
+    if(!alertEl||!email||!perigeeUsers.length){if(alertEl)alertEl.style.display='none';if(updEl)updEl.style.display='none';return;}
     const pu=findPerigeeUser(email);
-    if(pu){alertEl.style.display='none';if(statusEl)statusEl.value=pu.status;}
-    else{alertEl.style.display='block';if(statusEl)statusEl.value='NOT IN PERIGEE';}
+    if(pu){
+      alertEl.style.display='none';if(statusEl)statusEl.value=pu.status;
+      if(updEl){
+        const fn=(document.getElementById(pfx+'firstName')?.value||'').trim().toLowerCase();
+        const ln=(document.getElementById(pfx+'lastName')?.value||'').trim().toLowerCase();
+        const mismatch=(fn&&fn!==(pu.firstName||'').trim().toLowerCase())||(ln&&ln!==(pu.lastName||'').trim().toLowerCase());
+        updEl.style.display=mismatch?'block':'none';
+      }
+    }else{alertEl.style.display='block';if(statusEl)statusEl.value='NOT IN PERIGEE';if(updEl)updEl.style.display='none';}
   },200);
 }
 function onNameInput(pfx,which){
@@ -1526,6 +1579,7 @@ function renderTreeNode(nodeId,visibleIds,matchIds){
   }
   const ri=getRoleInfo(node.roleType);
   const isNip=node.notInPerigee;
+  const isNameMismatch=!isNip&&!!node.nameMismatch;
   const isDup=!!(node.email&&dupEmails.has(node.email.trim().toLowerCase()));
   const isDimmed=visibleIds&&matchIds&&!matchIds.has(nodeId);
   const dispName=node.firstName?(node.firstName+(node.lastName?' '+node.lastName:'')):(node.email||'(unnamed)');
@@ -1539,7 +1593,7 @@ function renderTreeNode(nodeId,visibleIds,matchIds){
   return`<div>
     <div class="node-slot${!node.parentId?' root-slot':''}">
     <button class="node-shift node-shift-l" onclick="event.stopPropagation();shiftNode('${nodeId}',-1)" title="Move left">◀</button>
-    <div class="node-card${!node.parentId?' is-root':''}${isSel?' selected':''}${isNip?' nip':''}${isDup?' is-dup':''}${isDimmed?' dimmed':''}${node.resigned?' is-resigned':''}${lv?' is-onleave':''}"${lv?` style="--lv:${lv.c}"`:''}
+    <div class="node-card${!node.parentId?' is-root':''}${isSel?' selected':''}${isNip?' nip':''}${isNameMismatch?' name-mismatch':''}${isDup?' is-dup':''}${isDimmed?' dimmed':''}${node.resigned?' is-resigned':''}${lv?' is-onleave':''}"${lv?` style="--lv:${lv.c}"`:''}
       data-node="${nodeId}" draggable="true"
       ondragstart="onDragStart(event,'${nodeId}')" ondragover="onDragOver(event,'${nodeId}')"
       ondragleave="onDragLeave(event,'${nodeId}')" ondrop="onDrop(event,'${nodeId}')"
@@ -1547,7 +1601,7 @@ function renderTreeNode(nodeId,visibleIds,matchIds){
       <div class="drag-handle" title="Drag to move">⠿</div>
       <div class="node-badge ${ri.color}">${ri.badge}</div>
       ${isDup?`<div class="dup-pip" title="Duplicate email: ${node.email}">2</div>`:''}
-      ${isNip?`<div class="nip-pip" title="Not in Perigee">!</div>`:''}
+      ${isNip?`<div class="nip-pip" title="Not in Perigee — email not found">!</div>`:isNameMismatch?`<div class="update-pip" title="Name differs from Perigee record">≠</div>`:''}
       ${lv?`<div class="leave-emoji ${lv.a}" title="${node.leaveType}${node.leaveStart?' · '+fmtDate(node.leaveStart):''}">${lv.e}</div>`:''}
       ${node.resigned?`<div class="resign-x" title="Resigned${node.resignedDate?' · '+fmtDate(node.resignedDate):''}"><svg viewBox="0 0 100 100" preserveAspectRatio="none"><path class="rx-stroke" d="M12,18 C30,30 55,48 88,82"/><path class="rx-stroke" d="M86,16 C66,32 42,52 14,84"/></svg><span class="resign-tag">RESIGNED${node.resignedDate?' · '+fmtDate(node.resignedDate):''}</span></div>`:''}
       <div class="node-name">${dispName}</div>
@@ -1724,7 +1778,7 @@ function exportExcel(){
   if(nipRows.length){
     const ws2=XLSX.utils.aoa_to_sheet([
       ['NOTE: These people are NOT yet in the Perigee system. Contact Outer Join to have them added.'],
-      ['Email: '+NIP_EMAIL+'   WhatsApp: '+NIP_WA_DISPLAY],[''],
+      ['Email: '+getNipEmail()+'   WhatsApp: '+getNipWaDisplay()],[''],
       ...XLSX.utils.sheet_to_json(XLSX.utils.json_to_sheet(nipRows),{header:1}),
     ]);
     XLSX.utils.book_append_sheet(wb,ws2,'Pending Perigee Activation');
@@ -1847,9 +1901,11 @@ function switchAdminTab(tab){
   document.getElementById('adminTabCycle').className='admin-tab'+(tab==='cycle'?' active':'');
   document.getElementById('adminTabSync').className='admin-tab'+(tab==='sync'?' active':'');
   document.getElementById('adminTabData').className='admin-tab'+(tab==='data'?' active':'');
+  document.getElementById('adminTabSettings').className='admin-tab'+(tab==='settings'?' active':'');
   if(tab==='sync'){renderSyncTab();return;}
   if(tab==='data'){renderDataTab();return;}
   if(tab==='cycle'){renderCycleTab();return;}
+  if(tab==='settings'){renderSettingsTab();return;}
   const log=getAuditLog(),trash=getTrash();
   if(tab==='log'){
     const rows=log.slice().reverse().slice(0,300);
@@ -1928,7 +1984,7 @@ function importState(){
         orgNodes.forEach(n=>trash.push({...n,_deletedAt:new Date().toISOString(),_deletedBy:getDeviceId(),_batchId:batchId,_reason:'Pre-import backup'}));
         saveTrash(trash);
         orgNodes=state.nodes;
-        if(perigeeUsers.length)orgNodes.forEach(n=>{n.notInPerigee=!!n.email&&!findPerigeeUser(n.email);});
+        if(perigeeUsers.length)recalcPerigeeFlags(orgNodes);
         saveState();render();
         toast(`Imported ${orgNodes.length} nodes ✓ — previous tree backed up to trash`,'success');
       }catch(err){toast('Import failed: '+err.message,'error');}
@@ -2139,7 +2195,7 @@ async function loadFromCloud(){
     const{data,error}=await _supa.from('iram_org_state').select('*').eq('id','main').single();
     if(error||!data||!data.nodes)return false;
     orgNodes=data.nodes;
-    if(perigeeUsers.length)orgNodes.forEach(n=>{n.notInPerigee=!!n.email&&!findPerigeeUser(n.email);});
+    if(perigeeUsers.length)recalcPerigeeFlags(orgNodes);
     const recalcChanged=recalcMemberTeams();
     try{localStorage.setItem('iram-org-v5',JSON.stringify(orgNodes));}catch(e){}
     if(recalcChanged>0)syncToCloud();
@@ -2194,7 +2250,7 @@ function subscribeRealtime(){
       if(row.id==='main'){
         loadFromCloud().then(ok=>{if(ok){render();toast('Tree updated ↓','info');}});
       }else if(row.id==='perigee'){
-        loadPerigeeFromCloud().then(ok=>{if(ok){orgNodes.forEach(n=>{n.notInPerigee=!!n.email&&!findPerigeeUser(n.email);});render();}});
+        loadPerigeeFromCloud().then(ok=>{if(ok){recalcPerigeeFlags(orgNodes);render();}});
       }
     })
     .subscribe(status=>{
@@ -2403,6 +2459,65 @@ CREATE POLICY "allow_all"
     </div>`;
 }
 
+function renderSettingsTab(){
+  document.getElementById('adminContent').innerHTML=`
+    <div style="font-size:14px;font-weight:800;color:#1e293b;margin-bottom:4px">Settings</div>
+    <div style="font-size:11.5px;color:#64748b;margin-bottom:20px">Configure Perigee support contact details used in alert messages and email/WhatsApp templates.</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start">
+      <div class="admin-card">
+        <div class="admin-section-label">Perigee Support Contact</div>
+        <div class="fg">
+          <label class="fl">Email address</label>
+          <input id="nipEmailInput" class="fc" type="email" placeholder="e.g. support@perigee.co.za" value="${getNipEmail()}">
+        </div>
+        <div class="fg">
+          <label class="fl">WhatsApp number <span style="color:#94a3b8;font-weight:400">(with country code, no spaces)</span></label>
+          <input id="nipWaInput" class="fc" type="tel" placeholder="e.g. +27831234567" value="${getNipWa()}">
+        </div>
+        <div class="fg" style="margin-bottom:16px">
+          <label class="fl">WhatsApp display text <span style="color:#94a3b8;font-weight:400">(shown in panel)</span></label>
+          <input id="nipWaDisplayInput" class="fc" placeholder="e.g. +27 83 123 4567" value="${getNipWaDisplay()}">
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-primary btn-sm" onclick="saveNipSettings()">💾 Save</button>
+          <button class="btn btn-sm" style="background:#f1f5f9;color:#64748b" onclick="resetNipSettings()">↺ Reset to defaults</button>
+        </div>
+        <div id="nipSettingsFeedback" style="margin-top:10px;font-size:11px;color:#059669;display:none">✓ Settings saved</div>
+      </div>
+      <div class="admin-card" style="font-size:11.5px;color:#64748b;line-height:1.7">
+        <div class="admin-section-label">Where these are used</div>
+        <ul style="padding-left:16px;margin:0">
+          <li style="margin-bottom:6px"><b style="color:#1e293b">NIP alert</b> — "not in Perigee" orange panel on member cards</li>
+          <li style="margin-bottom:6px"><b style="color:#1e293b">Name mismatch alert</b> — purple panel when name differs from Perigee record</li>
+          <li style="margin-bottom:6px"><b style="color:#1e293b">Excel export</b> — NIP contact line in the export header</li>
+          <li><b style="color:#1e293b">Email / WhatsApp templates</b> — pre-filled contact messages for HR actions</li>
+        </ul>
+        <div style="margin-top:12px;padding:10px;background:#fefce8;border-radius:6px;border:1px solid #fde68a;font-size:10.5px;color:#78350f">
+          <b>Note:</b> These settings are stored in this browser's localStorage. Each device/browser will need to be configured separately if different from the defaults.
+        </div>
+      </div>
+    </div>`;
+}
+
+function saveNipSettings(){
+  const email=(document.getElementById('nipEmailInput').value||'').trim();
+  const wa=(document.getElementById('nipWaInput').value||'').trim();
+  const waDisplay=(document.getElementById('nipWaDisplayInput').value||'').trim();
+  if(email) localStorage.setItem('iram-nip-email',email); else localStorage.removeItem('iram-nip-email');
+  if(wa) localStorage.setItem('iram-nip-wa',wa); else localStorage.removeItem('iram-nip-wa');
+  if(waDisplay) localStorage.setItem('iram-nip-wa-display',waDisplay); else localStorage.removeItem('iram-nip-wa-display');
+  const fb=document.getElementById('nipSettingsFeedback');
+  if(fb){fb.style.display='block';setTimeout(()=>{fb.style.display='none';},2500);}
+}
+
+function resetNipSettings(){
+  if(!confirm('Reset Perigee contact to defaults?')) return;
+  localStorage.removeItem('iram-nip-email');
+  localStorage.removeItem('iram-nip-wa');
+  localStorage.removeItem('iram-nip-wa-display');
+  renderSettingsTab();
+}
+
 async function saveAndConnectSupa(){
   const url=(document.getElementById('supaUrl').value||'').trim();
   const key=(document.getElementById('supaKey').value||'').trim();
@@ -2446,7 +2561,7 @@ recalcMemberTeams();
 render();
 if(initSupabase()){
   Promise.all([loadFromCloud(),loadPerigeeFromCloud()]).then(([treeOk,perigeeOk])=>{
-    if(perigeeOk)orgNodes.forEach(n=>{n.notInPerigee=!!n.email&&!findPerigeeUser(n.email);});
+    if(perigeeOk)recalcPerigeeFlags(orgNodes);
     if(treeOk||perigeeOk)render();
     subscribeRealtime();
   });
