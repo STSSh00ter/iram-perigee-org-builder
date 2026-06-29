@@ -1842,19 +1842,39 @@ function exportExcel(){
   const ws1=XLSX.utils.json_to_sheet(perigeeRows.length?perigeeRows:rows);
   ws1['!cols']=cw;XLSX.utils.book_append_sheet(wb,ws1,'Teams And User Cycle');
   if(nipRows.length){
+    const hrContact='Email: '+getHrEmail()+(getHrWaDisplay()?'   WhatsApp: '+getHrWaDisplay():'');
     const ws2=XLSX.utils.aoa_to_sheet([
-      ['NOTE: These people are NOT yet in the Perigee system. Contact Outer Join to have them added.'],
-      ['Email: '+getNipEmail()+'   WhatsApp: '+getNipWaDisplay()],[''],
+      ['NOTE: These people are NOT yet in the Perigee system. Contact HR to have them added before the next call cycle upload.'],
+      [hrContact],[''],
       ...XLSX.utils.sheet_to_json(XLSX.utils.json_to_sheet(nipRows),{header:1}),
     ]);
+    ws2['!cols']=cw;
     XLSX.utils.book_append_sheet(wb,ws2,'Pending Perigee Activation');
+  }
+  const mismatchNodes=orgNodes.filter(n=>n.nameMismatch&&n.roleType!=='TEAM_GROUP');
+  if(mismatchNodes.length){
+    const mismatchData=mismatchNodes.map(node=>{
+      const pu=findPerigeeUser(node.email);
+      const puName=pu?((pu.firstName||'')+' '+(pu.lastName||'')).trim():'—';
+      const{teamName}=getMembershipInfo(node.id);
+      const lm=getDirectManager(node.id);
+      return{'USER EMAIL':node.email,'NAME IN TREE':((node.firstName||'')+' '+(node.lastName||'')).trim(),'NAME IN PERIGEE':puName,'TEAM NAME':teamName,'LINE MANAGER':fmtPerson(lm)};
+    });
+    const nipContact='Email: '+getNipEmail()+'   WhatsApp: '+getNipWaDisplay();
+    const ws4=XLSX.utils.aoa_to_sheet([
+      ['NOTE: These users are in Perigee but their name does not match the tree. Contact Perigee support to update. Email/username cannot be changed — email changes must go via HR.'],
+      [nipContact],[''],
+      ...XLSX.utils.sheet_to_json(XLSX.utils.json_to_sheet(mismatchData),{header:1}),
+    ]);
+    ws4['!cols']=[{wch:34},{wch:26},{wch:26},{wch:28},{wch:38}];
+    XLSX.utils.book_append_sheet(wb,ws4,'Perigee Name Updates');
   }
   const ws3=XLSX.utils.aoa_to_sheet(buildSummarySheet());
   ws3['!cols']=[{wch:6},{wch:30},{wch:34},{wch:22},{wch:16},{wch:30}];
   XLSX.utils.book_append_sheet(wb,ws3,'Org Summary');
   const date=new Date().toISOString().slice(0,10);
   XLSX.writeFile(wb,`iRam-Perigee-OrgExport-${date}.xlsx`);
-  toast(`Exported ${rows.length} rows (${nipRows.length} pending activation) ✓`,'success');
+  toast(`Exported ${rows.length} rows · ${nipRows.length} pending activation · ${mismatchNodes.length} name updates ✓`,'success');
 }
 function buildSummarySheet(){
   const rows=[['Level','Full Name','Email','Job Title','Role Type','Team(s)']];
