@@ -110,9 +110,9 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#eef2f7;color:#1e293b;he
 .node-card.dimmed{opacity:.4;pointer-events:none}
 .node-badge{position:absolute;top:-9px;left:50%;transform:translateX(-50%);padding:2px 9px;border-radius:20px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#fff;white-space:nowrap}
 .nip-pip{position:absolute;top:5px;right:6px;width:16px;height:16px;background:#fb923c;border-radius:50%;font-size:9px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;box-shadow:0 1px 4px rgba(251,146,60,.6)}
-.dup-pip{position:absolute;top:5px;right:26px;width:16px;height:16px;background:#7c3aed;border-radius:50%;font-size:9px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;box-shadow:0 1px 4px rgba(124,58,237,.6)}
-.node-card.is-dup{border-color:#7c3aed}
-.node-card.is-dup.selected{border-color:#6d28d9;box-shadow:0 0 0 3px rgba(124,58,237,.22)}
+.dup-pip{position:absolute;top:5px;right:26px;width:16px;height:16px;background:#e11d48;border-radius:50%;font-size:9px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;box-shadow:0 1px 4px rgba(225,29,72,.6)}
+.node-card.is-dup{border-color:#e11d48;background:#fff1f2}
+.node-card.is-dup.selected{border-color:#be123c;box-shadow:0 0 0 3px rgba(225,29,72,.2)}
 .drag-handle{position:absolute;top:5px;left:5px;font-size:11px;color:#cbd5e1;line-height:1;cursor:grab;user-select:none}
 .node-name{font-weight:700;font-size:12px;margin-top:5px;color:#1e293b;padding-left:10px}
 .node-title{font-size:10px;color:#64748b;margin-top:2px;padding-left:10px}
@@ -1275,6 +1275,11 @@ function buildFormHTML(node,pfx){
         <a href="${updWaHref}" target="_blank" class="btn-wa">WhatsApp ↗</a>
       </div>
     </div>
+    ${perigeeUsers.length>0?`<div style="font-size:9.5px;color:#94a3b8;line-height:1.6;padding:3px 2px 6px;border-top:1px solid #f1f5f9;margin-top:2px">
+      <span style="display:inline-block;background:#fff7ed;color:#9a3412;border-radius:3px;padding:0 4px;font-weight:700;margin-right:3px">⚠ Orange</span>Email not in Perigee — contact <b style="color:#475569">HR</b> to add user
+      &nbsp;&nbsp;
+      <span style="display:inline-block;background:#faf5ff;color:#5b21b6;border-radius:3px;padding:0 4px;font-weight:700;margin-right:3px">≠ Purple</span>Name differs — contact <b style="color:#475569">Perigee</b> to update
+    </div>`:''}
     <div class="fg"><label class="fl">Perigee Status</label>
       <input id="${pfx}status" class="fc" readonly placeholder="— load Perigee file to validate —"
         value="${pu?pu.status:(node.email&&perigeeUsers.length>0?'NOT IN PERIGEE':'')}">
