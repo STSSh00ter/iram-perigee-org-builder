@@ -593,6 +593,23 @@ function getTeamLeaderFor(id){
 function getASMFor(id){return getAncestorOfRole(id,'AREA_MANAGER');}
 function getRegMgrFor(id){return getAncestorOfRole(id,'REGIONAL_MANAGER');}
 
+// Membership info: a person belongs to exactly ONE group (the nearest TEAM_GROUP above them).
+// Their TEAM LEADER = the person who owns/manages that group.
+function getMembershipInfo(nodeId){
+  const node=getNode(nodeId);if(!node)return{teamName:'',tl:null};
+  let pid=node.parentId;
+  while(pid){
+    const p=getNode(pid);if(!p)break;
+    if(p.roleType==='TEAM_GROUP'){
+      const tl=getTeamLeaderFor(p.id);
+      return{teamName:p.teamName||'',tl};
+    }
+    pid=p.parentId;
+  }
+  // No TEAM_GROUP above (root or legacy direct-person parent) — fall back to own teamName
+  return{teamName:node.teamName||'',tl:getTeamLeaderFor(nodeId)};
+}
+
 // Smart TL lookup: find ancestor who claims this specific team (via teamName or extraTeams)
 function getTeamLeaderForExport(nodeId, teamName){
   let n=getNode(nodeId);
@@ -931,7 +948,19 @@ function confirmModal(){
     if(!email){toast('Email is required','error');return;}
     if(orgNodes.find(n=>n.email===email)){if(!confirm(`"${email}" is already in the tree. Add duplicate?`))return;}
   }
-  collectFormInto(node,'modal_');closeModal();insertNode(node);
+  collectFormInto(node,'modal_');closeModal();
+  orgNodes.push(node);logAudit('ADD',node);
+  // Auto-create a TEAM_GROUP child for every leader role so members have a group to sit under
+  if(node.roleType!=='MEMBER'&&node.roleType!=='TEAM_GROUP'){
+    const grp=makeNode(node.id);
+    grp.roleType='TEAM_GROUP';grp.teamName=node.teamName||'';
+    grp.assignedProvinces=node.assignedProvinces||'';
+    orgNodes.push(grp);logAudit('ADD',grp);
+  }
+  saveState();selectedNodeId=node.id;render();
+  const _lbl=node.firstName||node.email||'Person';
+  const _extra=node.roleType!=='MEMBER'&&node.roleType!=='TEAM_GROUP'?' + team group auto-created':'';
+  toast(_lbl+' added'+_extra+(node.notInPerigee?' ⚠️ Not in Perigee':''),'success');
 }
 
 function selectNode(id){
@@ -1540,19 +1569,15 @@ function exportPDF(){
 function exportExcel(){
   if(!orgNodes.length){toast('Tree is empty — add people first','error');return;}
   const rows=[];
+  // Rule: 1 person = 1 row. Their membership = the nearest TEAM_GROUP above them.
+  // Their TEAM LEADER = whoever owns/manages that group. They can lead many groups,
+  // appearing as TEAM LEADER in their subordinates' rows — never in their own.
   orgNodes.forEach(node=>{
-    if(node.roleType==='TEAM_GROUP')return; // structural node — not a person
+    if(node.roleType==='TEAM_GROUP')return;
     const asm=getASMFor(node.id),rm=getRegMgrFor(node.id);
     const pu=findPerigeeUser(node.email);
-    // AM/CH roles belong to their MANAGER's team, not their own managed team
-    const isSeniorLeader=node.roleType==='AREA_MANAGER'||node.roleType==='CHANNEL_HEAD';
-    let exportTeamName=node.teamName;
-    let exportTL=getTeamLeaderForExport(node.id,node.teamName);
-    if(isSeniorLeader){
-      const mgr=getTeamLeaderFor(node.id); // first person above in the tree
-      if(mgr&&mgr.teamName){exportTeamName=mgr.teamName;exportTL=mgr;}
-    }
-    const baseRow={
+    const{teamName,tl}=getMembershipInfo(node.id);
+    rows.push({
       'USER ID':'','USER EMAIL':node.email,
       'FIRST NAME':node.firstName,'SURNAME':node.lastName,
       'STATUS':pu?pu.status:(node.notInPerigee?'NOT IN PERIGEE':'ACTIVE'),
@@ -1563,33 +1588,13 @@ function exportExcel(){
       'LEAVE TYPE':node.leaveType||'',
       'LEAVE START':node.leaveStart?fmtDate(node.leaveStart):'',
       'LEAVE END':node.leaveEnd?fmtDate(node.leaveEnd):'',
-      'TEAM NAME':exportTeamName,
-      'TEAM LEADER':node.roleType==='TEAM_LEADER'?fmtPerson(node):fmtPerson(exportTL),
+      'TEAM NAME':teamName,
+      'TEAM LEADER':fmtPerson(tl),
       'ASM':node.roleType==='AREA_MANAGER'?fmtPerson(node):fmtPerson(asm),
       'REGIONAL MANAGER':node.roleType==='REGIONAL_MANAGER'?fmtPerson(node):fmtPerson(rm),
       'ACTION':node.notInPerigee?'PENDING_PERIGEE_ACTIVATION':'ADD',
       'CYCLE STATUS':'ACTIVE','CYCLE':4,'CYCLE START DATE':'','CYCLE END DATE':'',
-    };
-    rows.push(baseRow);
-    if(node.roleType==='TEAM_LEADER'){
-      // Auto-row for the immediate parent TEAM_GROUP; TL = the person who owns the group (e.g. Sibusiso for Team EC 1)
-      const parentGrp=getNode(node.parentId);
-      if(parentGrp&&parentGrp.roleType==='TEAM_GROUP'&&parentGrp.teamName&&parentGrp.teamName!==node.teamName){
-        const grpLeader=getTeamLeaderFor(parentGrp.id);
-        rows.push({...baseRow,'TEAM NAME':parentGrp.teamName,'TEAM LEADER':fmtPerson(grpLeader||node)});
-      }
-      // Manual extra teams
-      (node.extraTeams||[]).forEach(extraTeam=>{
-        rows.push({...baseRow,'TEAM NAME':extraTeam});
-      });
-    } else if(!isSeniorLeader){
-      // MEMBER extra teams
-      (node.extraTeams||[]).forEach(extraTeam=>{
-        const etl=getTeamLeaderForExport(node.id,extraTeam);
-        rows.push({...baseRow,'TEAM NAME':extraTeam,'TEAM LEADER':fmtPerson(etl)});
-      });
-    }
-    // AM/CH: membership row only — their managed teams surface through TL rows above
+    });
   });
   const wb=XLSX.utils.book_new();
   const cw=[{wch:10},{wch:34},{wch:16},{wch:16},{wch:18},{wch:14},{wch:22},{wch:10},{wch:14},{wch:12},{wch:14},{wch:12},{wch:28},{wch:38},{wch:38},{wch:38},{wch:28},{wch:14},{wch:8},{wch:16},{wch:14}];
