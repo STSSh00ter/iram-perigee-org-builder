@@ -857,6 +857,10 @@ function isActiveLeave(node){
   // No end date = indefinite leave; otherwise check end date hasn't passed
   return !node.leaveEnd||node.leaveEnd>=todayStr();
 }
+function isExpiredResigned(node){
+  if(!node||!node.resigned||!node.resignedDate)return false;
+  return(new Date()-new Date(node.resignedDate))>45*24*60*60*1000;
+}
 function renderFilterBar(){
   if(!orgNodes.length){document.getElementById('filterBar').innerHTML='';return;}
   const provs=availableProvinceFilters();
@@ -1629,7 +1633,7 @@ function renderTreeNode(nodeId,visibleIds,matchIds){
   const node=getNode(nodeId);if(!node)return'';
   const isSel=selectedNodeId===nodeId;
   const allCh=getChildren(nodeId);
-  const visibleCh=visibleIds?allCh.filter(c=>visibleIds.has(c.id)):allCh;
+  const visibleCh=(visibleIds?allCh.filter(c=>visibleIds.has(c.id)):allCh).filter(c=>!isExpiredResigned(getNode(c.id)));
   // ── Team Group: compact header card with dashed connector ──
   if(node.roleType==='TEAM_GROUP'){
     const isDimmed=visibleIds&&matchIds&&!matchIds.has(nodeId);
@@ -1714,7 +1718,7 @@ function render(){
     matchIds=new Set(orgNodes.filter(n=>isProvMatch(n)&&isTeamMatch(n))
       .flatMap(n=>[n.id,...allDescendants(n.id).map(d=>d.id)]));
   }
-  const visibleRoots=visibleIds?roots.filter(r=>visibleIds.has(r.id)):roots;
+  const visibleRoots=(visibleIds?roots.filter(r=>visibleIds.has(r.id)):roots).filter(r=>!isExpiredResigned(r));
   const warnHTML=perigeeUsers.length===0&&!warnBannerDismissed?`
     <div class="warn-banner" onclick="loadPerigeeFile()" title="Click to load Perigee users file">
       <span style="font-size:18px">⚠️</span>
