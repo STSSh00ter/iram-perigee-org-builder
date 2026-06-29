@@ -493,6 +493,9 @@ body.viewer-mode .node-card{cursor:default}
 function getNipEmail(){return localStorage.getItem('iram-nip-email')||'laurette@outerjoin.co.za';}
 function getNipWa(){return localStorage.getItem('iram-nip-wa')||'+27833532230';}
 function getNipWaDisplay(){return localStorage.getItem('iram-nip-wa-display')||getNipWa();}
+function getHrEmail(){return localStorage.getItem('iram-hr-email')||'HR@iram.co.za';}
+function getHrWa(){return localStorage.getItem('iram-hr-wa')||'';}
+function getHrWaDisplay(){return localStorage.getItem('iram-hr-wa-display')||getHrWa();}
 const ROLE_TYPES=[
   {v:'REGIONAL_MANAGER',label:'Regional Manager',color:'role-reg',badge:'Reg. Manager'},
   {v:'CHANNEL_HEAD',label:'Channel Head',color:'role-chan',badge:'Channel Head'},
@@ -1209,12 +1212,12 @@ function buildFormHTML(node,pfx){
   const nipLm=getDirectManager(node.id);
   const nipLmName=nipLm?((nipLm.firstName+' '+nipLm.lastName).trim()||nipLm.email||'—'):'—';
   const nipLmEmail=nipLm?(nipLm.email||'—'):'—';
-  // NIP (email not found) — Add new user
+  // NIP (email not found) — HR must add user
   const nipSubject=encodeURIComponent(`Perigee User Activation Request – ${nipName}`);
-  const nipEmailBody=encodeURIComponent(`Hi Laurette,\n\nPlease add the following person to the Perigee system so they can be included in the IRAM call cycle upload.\n\nName: ${nipName}\nEmail: ${node.email||'—'}\nJob Title: ${node.jobTitle||'—'}\nTeam: ${node.teamName||'—'}\nRole: ${getRoleInfo(node.roleType).label}\nProvince(s): ${node.assignedProvinces||'—'}\nReports To: ${nipLmName}\nManager Email: ${nipLmEmail}\n\nKindly confirm once the account has been activated.\n\nRegards,\niRam`);
-  const nipEmailHref=`mailto:${getNipEmail()}?cc=HR@iram.co.za&subject=${nipSubject}&body=${nipEmailBody}`;
-  const nipWaHref=`https://wa.me/${getNipWa()}?text=${encodeURIComponent(`Hi Laurette\n\nPlease add the following person to Perigee:\n\nName: ${nipName}\nEmail: ${node.email||'-'}\nJob Title: ${node.jobTitle||'-'}\nTeam: ${node.teamName||'-'}\nProvince(s): ${node.assignedProvinces||'-'}\nReports To: ${nipLmName} (${nipLmEmail})\n\nThank you!`)}`;
-  // Name mismatch — Update existing user info
+  const nipEmailBody=encodeURIComponent(`Hi,\n\nPlease add the following person to the Perigee system so they can be included in the IRAM call cycle upload.\n\nName: ${nipName}\nEmail: ${node.email||'—'}\nJob Title: ${node.jobTitle||'—'}\nTeam: ${node.teamName||'—'}\nRole: ${getRoleInfo(node.roleType).label}\nProvince(s): ${node.assignedProvinces||'—'}\nReports To: ${nipLmName}\nManager Email: ${nipLmEmail}\n\nKindly confirm once the account has been activated.\n\nRegards,\niRam`);
+  const nipEmailHref=`mailto:${getHrEmail()}?subject=${nipSubject}&body=${nipEmailBody}`;
+  const nipWaHref=getHrWa()?`https://wa.me/${getHrWa()}?text=${encodeURIComponent(`Hi\n\nPlease add the following person to Perigee:\n\nName: ${nipName}\nEmail: ${node.email||'-'}\nJob Title: ${node.jobTitle||'-'}\nTeam: ${node.teamName||'-'}\nProvince(s): ${node.assignedProvinces||'-'}\nReports To: ${nipLmName} (${nipLmEmail})\n\nThank you!`)}`:'';
+  // Name mismatch — Perigee support updates existing user info
   const puName=pu?`${pu.firstName||''} ${pu.lastName||''}`.trim():'';
   const nameMismatchShow=perigeeUsers.length>0&&!!pu&&!nameMatchesPu(node,pu);
   const updSubject=encodeURIComponent(`Perigee User Info Update – ${node.email}`);
@@ -1245,18 +1248,18 @@ function buildFormHTML(node,pfx){
       <div id="${pfx}emailAcList" class="ac-list"></div>
     </div>
     <div id="${pfx}nipAlert" class="nip-alert" style="display:${nipShow?'block':'none'}">
-      <div class="nip-title">⚠️ Not in Perigee — contact to add</div>
-      <div style="margin-bottom:8px;font-size:10px;line-height:1.4">Email not found in Perigee. Outer Join must add this person before they can be included in a call cycle upload.</div>
-      <div class="nip-row"><span class="nip-label" style="font-size:9px;font-weight:800;color:#9a3412;width:auto;padding:1px 5px;background:#fee2e2;border-radius:3px">EMAIL</span><span class="nip-val">${getNipEmail()} <span style="opacity:.6;font-size:9px">· cc: HR@iram.co.za</span></span></div>
+      <div class="nip-title">⚠️ Not in Perigee — contact HR to add</div>
+      <div style="margin-bottom:8px;font-size:10px;line-height:1.4">Email not found in Perigee. HR must add this person to the system before they can be included in the call cycle upload.</div>
+      <div class="nip-row"><span class="nip-label" style="font-size:9px;font-weight:800;color:#9a3412;width:auto;padding:1px 5px;background:#fee2e2;border-radius:3px">EMAIL</span><span class="nip-val">${getHrEmail()}</span></div>
       <div class="nip-actions">
-        <button class="btn-copy" onclick="copyText('${getNipEmail()}')">Copy Email</button>
+        <button class="btn-copy" onclick="copyText('${getHrEmail()}')">Copy Email</button>
         <a href="${nipEmailHref}" class="btn-wa" style="background:#2563eb">Open Email ↗</a>
       </div>
-      <div class="nip-row" style="margin-top:6px"><span class="nip-label" style="font-size:9px;font-weight:800;color:#166534;width:auto;padding:1px 5px;background:#dcfce7;border-radius:3px">WA</span><span class="nip-val">${getNipWaDisplay()}</span></div>
+      ${getHrWa()?`<div class="nip-row" style="margin-top:6px"><span class="nip-label" style="font-size:9px;font-weight:800;color:#166534;width:auto;padding:1px 5px;background:#dcfce7;border-radius:3px">WA</span><span class="nip-val">${getHrWaDisplay()}</span></div>
       <div class="nip-actions">
-        <button class="btn-copy" onclick="copyText('${getNipWaDisplay()}')">Copy Number</button>
+        <button class="btn-copy" onclick="copyText('${getHrWaDisplay()}')">Copy Number</button>
         <a href="${nipWaHref}" target="_blank" class="btn-wa">WhatsApp ↗</a>
-      </div>
+      </div>`:''}
     </div>
     <div id="${pfx}updateAlert" class="update-alert" style="display:${nameMismatchShow?'block':'none'}">
       <div class="nip-title">≠ Name differs from Perigee record</div>
@@ -2431,15 +2434,28 @@ function renderCycleModal(){
 
       ${show('treeOnly')&&treeOnly.length?`
       <div style="margin-bottom:20px">
-        <div style="font-size:11.5px;font-weight:800;color:#991b1b;margin-bottom:10px">On Tree — NOT on Call Cycle (${treeOnly.length})</div>
-        ${treeOnly.map(node=>`
-          <div style="background:#fff;border:1px solid #fca5a5;border-radius:8px;padding:9px 14px;margin-bottom:5px;display:flex;align-items:center;gap:10px">
-            <div style="flex:1;min-width:0">
-              <div style="font-weight:700;font-size:12px;color:#1e293b">${(node.firstName+' '+node.lastName).trim()||node.email}</div>
-              <div style="font-size:10.5px;color:#64748b">${node.email} &nbsp;·&nbsp; ${getMembershipInfo(node.id).teamName||'(no team)'} &nbsp;·&nbsp; ${getRoleInfo(node.roleType).label}</div>
+        <div style="font-size:11.5px;font-weight:800;color:#991b1b;margin-bottom:4px">On Tree — NOT on Call Cycle (${treeOnly.length})</div>
+        <div style="font-size:10.5px;color:#64748b;margin-bottom:10px">Contact the person's <b>Area Manager</b> and <b>Team Leader</b> to get them added to the raw call cycle file.</div>
+        ${treeOnly.map(node=>{
+          const{teamName:memTeam,tl}=getMembershipInfo(node.id);
+          const am=tl?getDirectManager(tl.id):getDirectManager(node.id);
+          const tlName=tl?((tl.firstName+' '+tl.lastName).trim()||tl.email):'—';
+          const tlEmail=tl?(tl.email||''):'';
+          const amName=am?((am.firstName+' '+am.lastName).trim()||am.email):'—';
+          const amEmail=am?(am.email||''):'';
+          return `<div style="background:#fff;border:1px solid #fca5a5;border-radius:8px;padding:10px 14px;margin-bottom:6px">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+              <div style="flex:1;min-width:0">
+                <div style="font-weight:700;font-size:12px;color:#1e293b">${(node.firstName+' '+node.lastName).trim()||node.email}</div>
+                <div style="font-size:10.5px;color:#64748b">${node.email} &nbsp;·&nbsp; ${memTeam||'(no team)'} &nbsp;·&nbsp; ${getRoleInfo(node.roleType).label}</div>
+              </div>
+              <button class="btn btn-sm" style="background:#f1f5f9;color:#475569;font-size:10px;flex-shrink:0" onclick="closeCycleModal();selectNode('${node.id}')">View →</button>
             </div>
-            <button class="btn btn-sm" style="background:#f1f5f9;color:#475569;font-size:10.5px;flex-shrink:0" onclick="closeCycleModal();selectNode('${node.id}')">View →</button>
-          </div>`).join('')}
+            <div style="display:flex;gap:6px;flex-wrap:wrap;border-top:1px solid #fee2e2;padding-top:6px">
+              <span style="font-size:10px;background:#dbeafe;color:#1e40af;padding:2px 8px;border-radius:8px;font-weight:700">TL: ${tlName}${tlEmail?` · ${tlEmail}`:''}</span>
+              <span style="font-size:10px;background:#e0e7ff;color:#3730a3;padding:2px 8px;border-radius:8px;font-weight:700">AM: ${amName}${amEmail?` · ${amEmail}`:''}</span>
+            </div>
+          </div>`;}).join('')}
       </div>`:''}
 
       ${show('cycleOnly')&&cycleOnly.length?`
@@ -2539,10 +2555,12 @@ CREATE POLICY "allow_all"
 function renderSettingsTab(){
   document.getElementById('adminContent').innerHTML=`
     <div style="font-size:14px;font-weight:800;color:#1e293b;margin-bottom:4px">Settings</div>
-    <div style="font-size:11.5px;color:#64748b;margin-bottom:20px">Configure Perigee support contact details used in alert messages and email/WhatsApp templates.</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start">
-      <div class="admin-card">
-        <div class="admin-section-label">Perigee Support Contact</div>
+    <div style="font-size:11.5px;color:#64748b;margin-bottom:16px">Configure contact details used in alert messages and email/WhatsApp templates.</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start;margin-bottom:16px">
+
+      <div class="admin-card" style="border-top:3px solid #7c3aed">
+        <div class="admin-section-label" style="color:#6d28d9">Perigee Support Contact</div>
+        <div style="font-size:10.5px;color:#64748b;margin-bottom:10px">Used for <b>name mismatch</b> alerts (email found, name differs)</div>
         <div class="fg">
           <label class="fl">Email address</label>
           <input id="nipEmailInput" class="fc" type="email" placeholder="e.g. support@perigee.co.za" value="${getNipEmail()}">
@@ -2551,26 +2569,52 @@ function renderSettingsTab(){
           <label class="fl">WhatsApp number <span style="color:#94a3b8;font-weight:400">(with country code, no spaces)</span></label>
           <input id="nipWaInput" class="fc" type="tel" placeholder="e.g. +27831234567" value="${getNipWa()}">
         </div>
-        <div class="fg" style="margin-bottom:16px">
-          <label class="fl">WhatsApp display text <span style="color:#94a3b8;font-weight:400">(shown in panel)</span></label>
+        <div class="fg" style="margin-bottom:14px">
+          <label class="fl">WhatsApp display text</label>
           <input id="nipWaDisplayInput" class="fc" placeholder="e.g. +27 83 123 4567" value="${getNipWaDisplay()}">
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn btn-primary btn-sm" onclick="saveNipSettings()">💾 Save</button>
-          <button class="btn btn-sm" style="background:#f1f5f9;color:#64748b" onclick="resetNipSettings()">↺ Reset to defaults</button>
+          <button class="btn btn-sm" style="background:#f1f5f9;color:#64748b" onclick="resetNipSettings()">↺ Defaults</button>
         </div>
-        <div id="nipSettingsFeedback" style="margin-top:10px;font-size:11px;color:#059669;display:none">✓ Settings saved</div>
+        <div id="nipSettingsFeedback" style="margin-top:8px;font-size:11px;color:#059669;display:none">✓ Saved</div>
       </div>
-      <div class="admin-card" style="font-size:11.5px;color:#64748b;line-height:1.7">
-        <div class="admin-section-label">Where these are used</div>
-        <ul style="padding-left:16px;margin:0">
-          <li style="margin-bottom:6px"><b style="color:#1e293b">NIP alert</b> — "not in Perigee" orange panel on member cards</li>
-          <li style="margin-bottom:6px"><b style="color:#1e293b">Name mismatch alert</b> — purple panel when name differs from Perigee record</li>
-          <li style="margin-bottom:6px"><b style="color:#1e293b">Excel export</b> — NIP contact line in the export header</li>
-          <li><b style="color:#1e293b">Email / WhatsApp templates</b> — pre-filled contact messages for HR actions</li>
-        </ul>
-        <div style="margin-top:12px;padding:10px;background:#fefce8;border-radius:6px;border:1px solid #fde68a;font-size:10.5px;color:#78350f">
-          <b>Note:</b> These settings are stored in this browser's localStorage. Each device/browser will need to be configured separately if different from the defaults.
+
+      <div class="admin-card" style="border-top:3px solid #ea580c">
+        <div class="admin-section-label" style="color:#c2410c">HR Contact</div>
+        <div style="font-size:10.5px;color:#64748b;margin-bottom:10px">Used for <b>not in Perigee</b> alerts (email not found — HR adds/removes users)</div>
+        <div class="fg">
+          <label class="fl">Email address</label>
+          <input id="hrEmailInput" class="fc" type="email" placeholder="e.g. HR@iram.co.za" value="${getHrEmail()}">
+        </div>
+        <div class="fg">
+          <label class="fl">WhatsApp number <span style="color:#94a3b8;font-weight:400">(with country code, no spaces)</span></label>
+          <input id="hrWaInput" class="fc" type="tel" placeholder="e.g. +27831234567" value="${getHrWa()}">
+        </div>
+        <div class="fg" style="margin-bottom:14px">
+          <label class="fl">WhatsApp display text</label>
+          <input id="hrWaDisplayInput" class="fc" placeholder="e.g. +27 83 123 4567" value="${getHrWaDisplay()}">
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-sm" style="background:#ea580c;color:#fff" onclick="saveHrSettings()">💾 Save</button>
+          <button class="btn btn-sm" style="background:#f1f5f9;color:#64748b" onclick="resetHrSettings()">↺ Defaults</button>
+        </div>
+        <div id="hrSettingsFeedback" style="margin-top:8px;font-size:11px;color:#059669;display:none">✓ Saved</div>
+      </div>
+    </div>
+
+    <div class="admin-card" style="font-size:11px;color:#64748b;line-height:1.7">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div>
+          <div class="admin-section-label">Contact routing</div>
+          <ul style="padding-left:16px;margin:0">
+            <li style="margin-bottom:5px"><b style="color:#7c3aed">Name mismatch</b> (≠ purple alert) → <b>Perigee support</b></li>
+            <li style="margin-bottom:5px"><b style="color:#ea580c">Not in Perigee</b> (⚠ orange alert) → <b>HR</b></li>
+            <li><b style="color:#991b1b">On tree, not on cycle</b> → <b>Area Manager + Team Leader</b> (shown per-person in Validate)</li>
+          </ul>
+        </div>
+        <div style="padding:10px;background:#fefce8;border-radius:6px;border:1px solid #fde68a;font-size:10.5px;color:#78350f;align-self:start">
+          <b>Note:</b> Settings are stored in this browser's localStorage — each device/browser needs to be configured separately.
         </div>
       </div>
     </div>`;
@@ -2592,6 +2636,23 @@ function resetNipSettings(){
   localStorage.removeItem('iram-nip-email');
   localStorage.removeItem('iram-nip-wa');
   localStorage.removeItem('iram-nip-wa-display');
+  renderSettingsTab();
+}
+function saveHrSettings(){
+  const email=(document.getElementById('hrEmailInput').value||'').trim();
+  const wa=(document.getElementById('hrWaInput').value||'').trim();
+  const waDisplay=(document.getElementById('hrWaDisplayInput').value||'').trim();
+  if(email) localStorage.setItem('iram-hr-email',email); else localStorage.removeItem('iram-hr-email');
+  if(wa) localStorage.setItem('iram-hr-wa',wa); else localStorage.removeItem('iram-hr-wa');
+  if(waDisplay) localStorage.setItem('iram-hr-wa-display',waDisplay); else localStorage.removeItem('iram-hr-wa-display');
+  const fb=document.getElementById('hrSettingsFeedback');
+  if(fb){fb.style.display='block';setTimeout(()=>{fb.style.display='none';},2500);}
+}
+function resetHrSettings(){
+  if(!confirm('Reset HR contact to defaults?')) return;
+  localStorage.removeItem('iram-hr-email');
+  localStorage.removeItem('iram-hr-wa');
+  localStorage.removeItem('iram-hr-wa-display');
   renderSettingsTab();
 }
 
