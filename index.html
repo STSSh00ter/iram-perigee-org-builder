@@ -2300,6 +2300,8 @@ function loadCallCycleFile(afterLoad){
           firstName:r['FIRST NAME']||'',lastName:r['SURNAME']||'',
           teamName:(r['TEAM NAME']||'').trim(),status:r['STATUS']||'',
         }));
+        localStorage.setItem('iram-cycle-loaded-at',new Date().toISOString());
+        localStorage.setItem('iram-cycle-filename',file.name);
         toast(`Call cycle loaded: ${callCycleData.length} users from "${file.name}"`,'success');
         if(afterLoad)afterLoad();
       }catch(err){toast('Failed to read file: '+err.message,'error');}
@@ -2322,11 +2324,15 @@ function renderCycleModal(){
   const el=document.getElementById('cycleModalContent');
   if(!callCycleData.length){
     el.innerHTML=`
-      <div style="text-align:center;padding:60px 20px">
+      <div style="text-align:center;padding:50px 20px">
         <div style="font-size:48px;margin-bottom:16px">📊</div>
         <div style="font-size:15px;font-weight:800;color:#1e293b;margin-bottom:8px">No call cycle loaded</div>
         <div style="font-size:12px;color:#64748b;margin-bottom:24px;line-height:1.6">Upload the current call cycle Excel to cross-validate against the org tree.<br>Uses the <b>Teams And User Cycle</b> sheet.</div>
-        <button class="btn btn-primary" onclick="loadCallCycleFile(renderCycleModal)">📂 Load Call Cycle Excel…</button>
+        <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:16px">
+          <button class="btn btn-primary" onclick="loadCallCycleFile(renderCycleModal)">📂 Load Call Cycle Excel…</button>
+          <a href="https://live.perigeeportal.co.za/callcycle" target="_blank" rel="noopener" class="btn" style="background:#7c3aed;color:#fff;text-decoration:none">🌐 Open Perigee Call Cycle</a>
+        </div>
+        <div style="font-size:10.5px;color:#94a3b8">Download the latest file from Perigee, then load it here</div>
       </div>`;
     return;
   }
@@ -2363,9 +2369,28 @@ function renderCycleModal(){
   const showAll=!cycleFilter;
   const show=(key)=>showAll||cycleFilter===key;
 
+  const _loadedAt=localStorage.getItem('iram-cycle-loaded-at');
+  const _filename=localStorage.getItem('iram-cycle-filename')||'';
+  const _loadedDate=_loadedAt?new Date(_loadedAt):null;
+  const _ageDays=_loadedDate?Math.floor((Date.now()-_loadedDate.getTime())/(1000*60*60*24)):null;
+  const _ageLabel=_ageDays===null?'unknown date':_ageDays===0?'today':_ageDays===1?'yesterday':`${_ageDays} days ago`;
+  const _stale=_ageDays!==null&&_ageDays>30;
+  const _dateStr=_loadedDate?_loadedDate.toLocaleDateString('en-ZA',{day:'2-digit',month:'short',year:'numeric'}):'';
+
   el.innerHTML=`
     <div style="padding:20px 24px">
-      <div style="font-size:11.5px;color:#64748b;margin-bottom:16px">${callCycleData.length} users in cycle &nbsp;·&nbsp; ${treeNodes.length} in tree${cycleFilter?` &nbsp;·&nbsp; <span style="background:#e0f2fe;color:#0369a1;padding:1px 8px;border-radius:8px;font-weight:700;font-size:10.5px">Filtered view</span>`:'&nbsp;·&nbsp; click a tile to filter'}</div>
+      ${_stale?`<div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <div style="flex:1;min-width:200px">
+          <div style="font-size:12px;font-weight:800;color:#c2410c">⚠ Call cycle data is ${_ageDays} days old — consider refreshing</div>
+          <div style="font-size:10.5px;color:#92400e;margin-top:2px">Loaded ${_dateStr}${_filename?' · '+_filename:''}. Download the latest from Perigee before validating.</div>
+        </div>
+        <a href="https://live.perigeeportal.co.za/callcycle" target="_blank" rel="noopener" class="btn btn-sm" style="background:#7c3aed;color:#fff;text-decoration:none;flex-shrink:0">🌐 Get fresh file</a>
+      </div>`:''}
+      <div style="font-size:11.5px;color:#64748b;margin-bottom:16px">
+        ${callCycleData.length} users in cycle &nbsp;·&nbsp; ${treeNodes.length} in tree
+        ${_dateStr?`&nbsp;·&nbsp; Loaded: <b style="color:${_stale?'#c2410c':'#475569'}">${_ageLabel}</b> (${_dateStr})`:''}
+        ${cycleFilter?` &nbsp;·&nbsp; <span style="background:#e0f2fe;color:#0369a1;padding:1px 8px;border-radius:8px;font-weight:700;font-size:10.5px">Filtered view</span>`:'&nbsp;·&nbsp; click a tile to filter'}
+      </div>
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:24px">
         ${tileBtn('matched','Fully Matched',matched,'#dcfce7','#bbf7d0','#86efac','#4ade80','#15803d')}
         ${tileBtn('mismatch','Team Mismatch',mismatches.length,mismatches.length?'#fef9c3':'#f8fafc',mismatches.length?'#fef08a':'#f1f5f9',mismatches.length?'#fde047':'#e2e8f0',mismatches.length?'#facc15':'#cbd5e1',mismatches.length?'#854d0e':'#94a3b8')}
