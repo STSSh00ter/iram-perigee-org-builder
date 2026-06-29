@@ -971,13 +971,31 @@ function selectNode(id){
 }
 function saveEdit(){
   if(!selectedNodeId)return;const node=getNode(selectedNodeId);if(!node)return;
-  const roleType=document.getElementById('ep_roleType').value;
-  if(roleType!=='TEAM_GROUP'){
+  const newRole=document.getElementById('ep_roleType').value;
+  if(newRole!=='TEAM_GROUP'){
     const email=(document.getElementById('ep_email').value||'').trim().toLowerCase();
     if(!email){toast('Email is required','error');return;}
   }
+  // Demotion to MEMBER: remove their TEAM_GROUP(s) and move children up
+  if(newRole==='MEMBER'&&node.roleType!=='MEMBER'&&node.roleType!=='TEAM_GROUP'){
+    const grps=getChildren(node.id).filter(c=>c.roleType==='TEAM_GROUP');
+    if(grps.length){
+      const displaced=grps.flatMap(g=>getChildren(g.id));
+      const msg='⚠️ Changing to Team Member will remove '
+        +grps.length+' team group'+(grps.length>1?'s':'')+'.'
+        +(displaced.length?' '+displaced.length+' person'+(displaced.length>1?'s':'')+' inside will be moved up one level.':'')
+        +'\n\nContinue?';
+      if(!confirm(msg))return;
+      grps.forEach(grp=>{
+        // Move each child of the group up to the person's own parent
+        getChildren(grp.id).forEach(child=>{child.parentId=node.parentId;});
+        orgNodes.splice(orgNodes.findIndex(n=>n.id===grp.id),1);
+        logAudit('DELETE',grp,'auto-removed on demotion to MEMBER');
+      });
+    }
+  }
   collectFormInto(node,'ep_');logAudit('UPDATE',node);
-  // Auto-create TEAM_GROUP if promoted to a leader role and doesn't have one yet
+  // Promotion to leader: auto-create TEAM_GROUP if none exists yet
   if(node.roleType!=='MEMBER'&&node.roleType!=='TEAM_GROUP'&&!getChildren(node.id).some(c=>c.roleType==='TEAM_GROUP')){
     const grp=makeNode(node.id);
     grp.roleType='TEAM_GROUP';grp.teamName=node.teamName||'';
