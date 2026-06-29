@@ -1165,10 +1165,13 @@ function buildFormHTML(node,pfx){
   const extraOpts=teams.filter(t=>t!==node.teamName).map(t=>`<option value="${t}"${nodeExtra.includes(t)?' selected':''}>${t}</option>`).join('');
   // Pre-filled contact links for NIP alert
   const nipName=(node.firstName+' '+node.lastName).trim()||node.email||'[Name not set]';
+  const nipLm=getDirectManager(node.id);
+  const nipLmName=nipLm?((nipLm.firstName+' '+nipLm.lastName).trim()||nipLm.email||'—'):'—';
+  const nipLmEmail=nipLm?(nipLm.email||'—'):'—';
   const nipSubject=encodeURIComponent(`Perigee User Activation Request – ${nipName}`);
-  const nipEmailBody=encodeURIComponent(`Hi Laurette,\n\nPlease add the following person to the Perigee system so they can be included in the IRAM call cycle upload.\n\nName: ${nipName}\nEmail: ${node.email||'—'}\nJob Title: ${node.jobTitle||'—'}\nTeam: ${node.teamName||'—'}\nRole: ${getRoleInfo(node.roleType).label}\nProvince(s): ${node.assignedProvinces||'—'}\n\nKindly confirm once the account has been activated.\n\nRegards,\niRam`);
+  const nipEmailBody=encodeURIComponent(`Hi Laurette,\n\nPlease add the following person to the Perigee system so they can be included in the IRAM call cycle upload.\n\nName: ${nipName}\nEmail: ${node.email||'—'}\nJob Title: ${node.jobTitle||'—'}\nTeam: ${node.teamName||'—'}\nRole: ${getRoleInfo(node.roleType).label}\nProvince(s): ${node.assignedProvinces||'—'}\nReports To: ${nipLmName}\nManager Email: ${nipLmEmail}\n\nKindly confirm once the account has been activated.\n\nRegards,\niRam`);
   const nipEmailHref=`mailto:${NIP_EMAIL}?cc=HR@iram.co.za&subject=${nipSubject}&body=${nipEmailBody}`;
-  const nipWaHref=`https://wa.me/${NIP_WA}?text=${encodeURIComponent(`Hi Laurette 👋\n\nPlease add the following person to Perigee:\n\n👤 *${nipName}*\n📧 ${node.email||'—'}\n💼 ${node.jobTitle||'—'}\n🏷 Team: ${node.teamName||'—'}\n📍 ${node.assignedProvinces||'—'}\n\nThank you!`)}`;
+  const nipWaHref=`https://wa.me/${NIP_WA}?text=${encodeURIComponent(`Hi Laurette\n\nPlease add the following person to Perigee:\n\nName: ${nipName}\nEmail: ${node.email||'-'}\nJob Title: ${node.jobTitle||'-'}\nTeam: ${node.teamName||'-'}\nProvince(s): ${node.assignedProvinces||'-'}\nReports To: ${nipLmName} (${nipLmEmail})\n\nThank you!`)}`;
   return`
     <div class="section-div">Role &amp; Team</div>
     <div class="fg"><label class="fl">Role Type *</label>
