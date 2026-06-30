@@ -354,6 +354,18 @@ body.viewer-mode #epBody select.fc{pointer-events:none;background:#f8fafc;border
 body.viewer-mode #epBody .prov-chip{pointer-events:none;opacity:.7}
 body.viewer-mode #epBody .ac-list{display:none!important}
 .viewer-lock-strip{display:flex;align-items:center;gap:7px;background:#fef9c3;border:1px solid #fde68a;border-radius:7px;padding:8px 11px;font-size:11px;color:#92400e;font-weight:600;margin-bottom:12px;user-select:none}
+/* ── Access gate ── */
+.gate-overlay{position:fixed;inset:0;z-index:99999;background:#0f172a;display:flex;align-items:center;justify-content:center}
+.gate-card{background:#1e293b;border:1px solid #334155;border-radius:16px;padding:40px 36px;max-width:360px;width:90%;text-align:center;box-shadow:0 25px 50px rgba(0,0,0,.5)}
+.gate-logo{font-size:28px;font-weight:900;color:#f97316;letter-spacing:-.5px;margin-bottom:4px}
+.gate-title{font-size:16px;font-weight:700;color:#f8fafc;margin-bottom:4px}
+.gate-sub{font-size:11px;color:#64748b;margin-bottom:24px;line-height:1.6}
+.gate-pin{width:100%;padding:12px 14px;border:1px solid #334155;border-radius:8px;background:#0f172a;color:#f8fafc;font-size:15px;text-align:center;letter-spacing:.15em;outline:none;margin-bottom:10px;font-family:inherit;box-sizing:border-box}
+.gate-pin:focus{border-color:#f97316;box-shadow:0 0 0 2px rgba(249,115,22,.2)}
+.gate-btn{width:100%;padding:12px;background:#f97316;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit}
+.gate-btn:hover{background:#ea6c04}
+.gate-err{font-size:11px;color:#ef4444;min-height:18px;margin-top:6px}
+.gate-notice{font-size:10px;color:#475569;margin-top:20px;line-height:1.6;border-top:1px solid #1e293b;padding-top:16px}
 @media print{
   .zoom-controls{display:none!important}
   *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -372,6 +384,17 @@ body.viewer-mode #epBody .ac-list{display:none!important}
 </style>
 </head>
 <body>
+<div class="gate-overlay" id="gateOverlay">
+  <div class="gate-card">
+    <div class="gate-logo">iRam</div>
+    <div class="gate-title">Perigee Org Builder</div>
+    <div class="gate-sub">This system contains confidential employee information<br>protected under POPIA. Authorised access only.</div>
+    <input class="gate-pin" id="gatePinInput" type="password" placeholder="Enter access code" autocomplete="off" onkeydown="if(event.key==='Enter')checkGate()">
+    <button class="gate-btn" onclick="checkGate()">Access System</button>
+    <div class="gate-err" id="gateFeedback"></div>
+    <div class="gate-notice">🔒 Access to this system is restricted and logged.<br>Unauthorised access is a violation of POPIA.</div>
+  </div>
+</div>
 <div class="hdr">
   <div class="hdr-brand" style="display:flex;align-items:center;gap:8px;flex-shrink:0">
     <div class="hdr-logo">iRam</div>
@@ -613,6 +636,49 @@ async function migratePasswords(){
   if(!isHash(ep))localStorage.setItem('iram-editor-pass',await sha256hex(ep));
   const ap=localStorage.getItem('iram-admin-pass')||'iRam@admin2026';
   if(!isHash(ap))localStorage.setItem('iram-admin-pass',await sha256hex(ap));
+  const gp=localStorage.getItem('iram-gate-pass');
+  if(!isHash(gp))localStorage.setItem('iram-gate-pass',await sha256hex('iRam2026'));
+}
+function getGatePass(){return localStorage.getItem('iram-gate-pass');}
+function initGate(){
+  if(sessionStorage.getItem('iram-gate')==='ok'){passGate(false);return;}
+  setTimeout(()=>document.getElementById('gatePinInput')?.focus(),120);
+}
+async function checkGate(){
+  const pin=(document.getElementById('gatePinInput').value||'').trim();
+  const fb=document.getElementById('gateFeedback');
+  if(!pin)return;
+  const h=await sha256hex(pin);
+  const stored=getGatePass();
+  const match=stored?h===stored:h===await sha256hex('iRam2026');
+  if(match){
+    if(!stored)localStorage.setItem('iram-gate-pass',h);
+    sessionStorage.setItem('iram-gate','ok');
+    passGate(true);
+  }else{
+    fb.textContent='Incorrect access code';
+    document.getElementById('gatePinInput').value='';
+    document.getElementById('gatePinInput').focus();
+  }
+}
+function passGate(animate){
+  const ov=document.getElementById('gateOverlay');
+  if(ov){
+    if(animate){ov.style.transition='opacity .35s';ov.style.opacity='0';setTimeout(()=>ov.style.display='none',360);}
+    else{ov.style.display='none';}
+  }
+  initApp();
+}
+async function saveGatePass(){
+  const np=(document.getElementById('gatePassNew').value||'').trim();
+  const cp=(document.getElementById('gatePassConfirm').value||'').trim();
+  const fb=document.getElementById('gatePassFeedback');
+  if(!np){fb.style.display='block';fb.style.color='#dc2626';fb.textContent='Please enter a new code.';return;}
+  if(np!==cp){fb.style.display='block';fb.style.color='#dc2626';fb.textContent='Codes do not match.';return;}
+  localStorage.setItem('iram-gate-pass',await sha256hex(np));
+  document.getElementById('gatePassNew').value='';document.getElementById('gatePassConfirm').value='';
+  fb.style.display='block';fb.style.color='#059669';fb.textContent='✓ Access code updated.';
+  setTimeout(()=>{fb.style.display='none';},3000);
 }
 async function syncPerigeeToCloud(){
   if(!_supa||!perigeeUsers.length)return;
@@ -2831,6 +2897,28 @@ function renderSettingsTab(){
       </div>
     </div>
 
+    <div class="admin-card" style="border-top:3px solid #059669;margin-bottom:16px">
+      <div class="admin-section-label" style="color:#047857">🔒 Viewer Access Code</div>
+      <div style="font-size:10.5px;color:#64748b;margin-bottom:12px">Required to open the app at all — blocks the site before any data loads. Default code is <b>iRam2026</b> — change it immediately.</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div>
+          <div class="fg"><label class="fl">New access code</label>
+            <div style="display:flex;gap:6px"><input id="gatePassNew" class="fc" type="password" placeholder="New access code" autocomplete="new-password"><button onclick="togglePassVis('gatePassNew')" style="background:none;border:1px solid #e2e8f0;border-radius:6px;padding:0 8px;cursor:pointer;color:#64748b;flex-shrink:0" title="Show/hide">👁</button></div>
+          </div>
+          <div class="fg" style="margin-bottom:10px"><label class="fl">Confirm</label>
+            <input id="gatePassConfirm" class="fc" type="password" placeholder="Repeat new code" autocomplete="new-password">
+          </div>
+          <button class="btn btn-sm" style="background:#059669;color:#fff" onclick="saveGatePass()">💾 Save access code</button>
+          <div id="gatePassFeedback" style="margin-top:6px;font-size:11px;display:none"></div>
+        </div>
+        <div style="padding:10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;font-size:10.5px;color:#166534;line-height:1.6;align-self:start">
+          <b>What this protects:</b><br>
+          Anyone who opens the direct URL sees only the access screen — no names, no emails, no tree data loads until the correct code is entered.<br><br>
+          <b>Share only with:</b> authorised IRAM staff who need to view or edit this system.
+        </div>
+      </div>
+    </div>
+
     <div class="admin-card" style="font-size:11px;color:#64748b;line-height:1.7">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
         <div>
@@ -2959,20 +3047,22 @@ function autoSelectRoot(){
 // ─── INIT ───────────────────────────────────────────────────────────────────
 applyEditLevel();
 loadState();
+function initApp(){
+  if(orgNodes.length===0){orgNodes=getInitialOrg();saveState();}
+  recalcMemberTeams();
+  render();
+  autoSelectRoot();
+  if(initSupabase()){
+    Promise.all([loadFromCloud(),loadPerigeeFromCloud(),loadCycleFromCloud()]).then(([treeOk,perigeeOk,cycleOk])=>{
+      if(perigeeOk)recalcPerigeeFlags(orgNodes);
+      if(treeOk||perigeeOk){render();autoSelectRoot();}
+      subscribeRealtime();
+    });
+  }
+}
 detectLayout();
 document.body.classList.toggle('compact-view',compactView);
-if(orgNodes.length===0){orgNodes=getInitialOrg();saveState();}
-recalcMemberTeams();
-render();
-autoSelectRoot();
-migratePasswords();
-if(initSupabase()){
-  Promise.all([loadFromCloud(),loadPerigeeFromCloud(),loadCycleFromCloud()]).then(([treeOk,perigeeOk,cycleOk])=>{
-    if(perigeeOk)recalcPerigeeFlags(orgNodes);
-    if(treeOk||perigeeOk){render();autoSelectRoot();}
-    subscribeRealtime();
-  });
-}
+migratePasswords().then(()=>initGate());
 </script>
 </body>
 </html>
