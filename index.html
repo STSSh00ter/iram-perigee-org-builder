@@ -522,6 +522,8 @@ body.viewer-mode #epBody .ac-list{display:none!important}
 <div class="toast-container" id="toasts"></div>
 
 <script>
+function getRetentionDays(){return parseInt(localStorage.getItem('iram-retention-days')||'90',10);}
+function saveRetentionDays(n){localStorage.setItem('iram-retention-days',String(n));}
 function getNipEmail(){return localStorage.getItem('iram-nip-email')||'laurette@outerjoin.co.za';}
 function getNipWa(){return localStorage.getItem('iram-nip-wa')||'+27833532230';}
 function getNipWaDisplay(){return localStorage.getItem('iram-nip-wa-display')||getNipWa();}
@@ -679,6 +681,26 @@ async function saveGatePass(){
   document.getElementById('gatePassNew').value='';document.getElementById('gatePassConfirm').value='';
   fb.style.display='block';fb.style.color='#059669';fb.textContent='✓ Access code updated.';
   setTimeout(()=>{fb.style.display='none';},3000);
+}
+function saveRetentionSetting(){
+  const val=parseInt((document.getElementById('retentionDaysInput').value||''),10);
+  const fb=document.getElementById('retentionFeedback');
+  if(isNaN(val)||val<30){fb.style.display='block';fb.style.color='#dc2626';fb.textContent='Minimum 30 days.';return;}
+  if(val>1825){fb.style.display='block';fb.style.color='#dc2626';fb.textContent='Maximum 5 years (1825 days).';return;}
+  saveRetentionDays(val);
+  fb.style.display='block';fb.style.color='#059669';fb.textContent=`✓ Policy set to ${val} days`;
+  setTimeout(()=>{fb.style.display='none';renderSettingsTab();},2000);
+}
+async function manualRetentionPurge(){
+  const overdue=getRetentionOverdue();if(!overdue.length)return;
+  const names=overdue.map(n=>(n.firstName+' '+n.lastName).trim()||n.email).join('\n• ');
+  if(!confirm(`Permanently delete ${overdue.length} resigned staff record(s)?\n\n• ${names}\n\nThis cannot be undone.`))return;
+  overdue.forEach(n=>{
+    logAudit('PURGE',n,`Manual purge: data retention policy (${getRetentionDays()} days after resignation)`);
+    orgNodes=orgNodes.filter(x=>x.id!==n.id);
+  });
+  saveState();syncToCloud();render();renderSettingsTab();
+  toast(`${overdue.length} record(s) permanently deleted ✓`,'warn');
 }
 async function syncPerigeeToCloud(){
   if(!_supa||!perigeeUsers.length)return;
@@ -973,6 +995,21 @@ function isActiveLeave(node){
 function isExpiredResigned(node){
   if(!node||!node.resigned||!node.resignedDate)return false;
   return(new Date()-new Date(node.resignedDate))>45*24*60*60*1000;
+}
+function getRetentionOverdue(){
+  const cutoff=new Date();cutoff.setDate(cutoff.getDate()-getRetentionDays());
+  return orgNodes.filter(n=>n.resigned&&n.resignedDate&&n.roleType!=='TEAM_GROUP'&&new Date(n.resignedDate)<cutoff);
+}
+async function checkRetention(){
+  const overdue=getRetentionOverdue();if(!overdue.length)return;
+  overdue.forEach(n=>{
+    logAudit('PURGE',n,`Auto-purged: data retention policy (${getRetentionDays()} days after resignation)`);
+    orgNodes=orgNodes.filter(x=>x.id!==n.id);
+  });
+  saveState();
+  syncToCloud();
+  render();
+  toast(`${overdue.length} resigned staff permanently deleted — data retention policy (${getRetentionDays()} days)`,'warn');
 }
 function renderFilterBar(){
   if(!orgNodes.length){document.getElementById('filterBar').innerHTML='';return;}
@@ -2919,6 +2956,35 @@ function renderSettingsTab(){
       </div>
     </div>
 
+    <div class="admin-card" style="border-top:3px solid #dc2626;margin-bottom:16px">
+      <div class="admin-section-label" style="color:#b91c1c">🗓 Data Retention Policy (POPIA)</div>
+      <div style="font-size:10.5px;color:#64748b;margin-bottom:12px">Resigned staff are automatically and permanently deleted once their resigned date exceeds this period. This satisfies POPIA's requirement not to retain personal data longer than necessary.</div>
+      <div style="display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:start">
+        <div>
+          <div class="fg" style="margin-bottom:10px">
+            <label class="fl">Retention period after resigned date</label>
+            <div style="display:flex;gap:8px;align-items:center">
+              <input id="retentionDaysInput" class="fc" type="number" min="30" max="1825" value="${getRetentionDays()}" style="width:90px">
+              <span style="font-size:11px;color:#64748b;white-space:nowrap">days (~${Math.round(getRetentionDays()/30)} months)</span>
+            </div>
+          </div>
+          <button class="btn btn-sm" style="background:#dc2626;color:#fff" onclick="saveRetentionSetting()">💾 Save</button>
+          <div id="retentionFeedback" style="margin-top:6px;font-size:11px;display:none"></div>
+        </div>
+        <div style="padding:10px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;font-size:10.5px;color:#991b1b;line-height:1.7;align-self:start">
+          <b>Current policy:</b> Resigned staff auto-deleted <b>${getRetentionDays()} days</b> after resigned date.<br>
+          Auto-hide from tree view: <b>45 days</b> (separate, shorter threshold).<br>
+          <b>⚠ Purged records cannot be recovered.</b>
+        </div>
+      </div>
+      ${(()=>{const od=getRetentionOverdue();return od.length?`
+      <div style="margin-top:14px;padding:12px;background:#fef2f2;border:1px solid #fca5a5;border-radius:8px">
+        <div style="font-size:12px;font-weight:700;color:#991b1b;margin-bottom:8px">⚠ ${od.length} record(s) overdue for deletion</div>
+        ${od.map(n=>`<div style="font-size:11px;color:#7f1d1d;margin-bottom:3px">• ${(n.firstName+' '+n.lastName).trim()||n.email} — resigned ${fmtDate(n.resignedDate)}</div>`).join('')}
+        <button class="btn btn-danger btn-sm" style="margin-top:10px" onclick="manualRetentionPurge()">🗑 Delete overdue records now</button>
+      </div>`:`<div style="margin-top:10px;font-size:11px;color:#059669">✓ No records currently overdue for deletion</div>`})()}
+    </div>
+
     <div class="admin-card" style="font-size:11px;color:#64748b;line-height:1.7">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
         <div>
@@ -3056,6 +3122,7 @@ function initApp(){
     Promise.all([loadFromCloud(),loadPerigeeFromCloud(),loadCycleFromCloud()]).then(([treeOk,perigeeOk,cycleOk])=>{
       if(perigeeOk)recalcPerigeeFlags(orgNodes);
       if(treeOk||perigeeOk){render();autoSelectRoot();}
+      checkRetention();
       subscribeRealtime();
     });
   }
