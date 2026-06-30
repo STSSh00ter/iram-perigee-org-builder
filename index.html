@@ -580,11 +580,46 @@ function savePerigee(){
   syncPerigeeToCloud();
 }
 
+// ── Crypto: SHA-256 password hashing + AES-GCM data encryption ──────────────
+const _IRAM_PSALT='iRam-Perigee-Sec-2026';
+const _IRAM_ESEC='iRam-Data-Enc-Key-2026';
+async function sha256hex(str){
+  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str+_IRAM_PSALT));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+async function _getEncKey(){
+  const enc=new TextEncoder();
+  const km=await crypto.subtle.importKey('raw',enc.encode(_IRAM_ESEC),'PBKDF2',false,['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2',salt:enc.encode('iram-v1'),iterations:50000,hash:'SHA-256'},km,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
+}
+async function encryptPayload(obj){
+  const key=await _getEncKey();
+  const iv=crypto.getRandomValues(new Uint8Array(12));
+  const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,new TextEncoder().encode(JSON.stringify(obj)));
+  const out=new Uint8Array(12+ct.byteLength);out.set(iv);out.set(new Uint8Array(ct),12);
+  let b='';out.forEach(x=>b+=String.fromCharCode(x));return btoa(b);
+}
+async function decryptPayload(b64){
+  try{
+    const key=await _getEncKey();
+    const raw=Uint8Array.from(atob(b64),c=>c.charCodeAt(0));
+    const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:raw.slice(0,12)},key,raw.slice(12));
+    return JSON.parse(new TextDecoder().decode(pt));
+  }catch{return null;}
+}
+async function migratePasswords(){
+  const isHash=s=>/^[0-9a-f]{64}$/.test(s||'');
+  const ep=localStorage.getItem('iram-editor-pass')||'iRam_1';
+  if(!isHash(ep))localStorage.setItem('iram-editor-pass',await sha256hex(ep));
+  const ap=localStorage.getItem('iram-admin-pass')||'iRam@admin2026';
+  if(!isHash(ap))localStorage.setItem('iram-admin-pass',await sha256hex(ap));
+}
 async function syncPerigeeToCloud(){
   if(!_supa||!perigeeUsers.length)return;
   try{
     const slim=perigeeUsers.map(u=>({email:u.email,firstName:u.firstName,lastName:u.lastName,status:u.status,access:u.access}));
-    const{error}=await _supa.from('iram_org_state').upsert({id:'perigee',nodes:slim,updated_at:new Date().toISOString(),updated_by:getDeviceId()},{onConflict:'id'});
+    const enc=await encryptPayload(slim);
+    const{error}=await _supa.from('iram_org_state').upsert({id:'perigee',nodes:enc,updated_at:new Date().toISOString(),updated_by:getDeviceId()},{onConflict:'id'});
     if(error)console.warn('Perigee sync error:',error.message||error);
   }catch(e){console.warn('Perigee sync error:',e);}
 }
@@ -593,8 +628,15 @@ async function loadPerigeeFromCloud(){
   if(!_supa)return false;
   try{
     const{data,error}=await _supa.from('iram_org_state').select('nodes').eq('id','perigee').single();
-    if(error||!data||!Array.isArray(data.nodes)||!data.nodes.length)return false;
-    perigeeUsers=data.nodes;
+    if(error||!data||!data.nodes)return false;
+    let nodes;
+    if(typeof data.nodes==='string'){
+      nodes=await decryptPayload(data.nodes);
+      if(!nodes||!Array.isArray(nodes)||!nodes.length)return false;
+    }else if(Array.isArray(data.nodes)&&data.nodes.length){
+      nodes=data.nodes;
+    }else{return false;}
+    perigeeUsers=nodes;
     savePerigee();
     return true;
   }catch(e){return false;}
@@ -609,7 +651,8 @@ async function syncCycleToCloud(){
   if(!_supa||!callCycleData.length)return;
   try{
     const meta={loadedAt:localStorage.getItem('iram-cycle-loaded-at')||'',filename:localStorage.getItem('iram-cycle-filename')||''};
-    const{error}=await _supa.from('iram_org_state').upsert({id:'callcycle',nodes:{rows:callCycleData,meta},updated_at:new Date().toISOString(),updated_by:getDeviceId()},{onConflict:'id'});
+    const enc=await encryptPayload({rows:callCycleData,meta});
+    const{error}=await _supa.from('iram_org_state').upsert({id:'callcycle',nodes:enc,updated_at:new Date().toISOString(),updated_by:getDeviceId()},{onConflict:'id'});
     if(error)console.warn('Cycle sync error:',error.message||error);
   }catch(e){console.warn('Cycle sync error:',e);}
 }
@@ -618,7 +661,11 @@ async function loadCycleFromCloud(){
   try{
     const{data,error}=await _supa.from('iram_org_state').select('nodes').eq('id','callcycle').single();
     if(error||!data||!data.nodes)return false;
-    const payload=data.nodes;
+    let payload;
+    if(typeof data.nodes==='string'){
+      payload=await decryptPayload(data.nodes);
+      if(!payload)return false;
+    }else{payload=data.nodes;}
     if(Array.isArray(payload)){callCycleData=payload;}
     else if(payload.rows){
       callCycleData=payload.rows;
@@ -1012,7 +1059,7 @@ function clearAll(){
 // ─── ACCESS TIERS ────────────────────────────────────────────────────────────
 let editLevel=sessionStorage.getItem('iram-edit-level')||'viewer';
 function isEditor(){return editLevel==='editor';}
-function unlockEditing(){
+async function unlockEditing(){
   if(isEditor()){
     if(!confirm('Lock editing? You will need the password again to make changes.'))return;
     editLevel='viewer';sessionStorage.removeItem('iram-edit-level');
@@ -1020,10 +1067,10 @@ function unlockEditing(){
   }
   const pw=prompt('Enter editor password:');
   if(pw===null)return;
-  if(pw===getEditorPass()){
+  if(await sha256hex(pw)===getEditorPass()){
     editLevel='editor';sessionStorage.setItem('iram-edit-level','editor');
     applyEditLevel();
-    promptSetDeviceName(true); // silently skip if already set
+    promptSetDeviceName(true);
     toast('Editing unlocked ✓','success');
   } else {
     toast('Incorrect password','error');
@@ -2030,11 +2077,11 @@ function saveTrash(t){try{localStorage.setItem('iram-trash-v1',JSON.stringify(t)
 
 // ─── ADMIN PANEL ─────────────────────────────────────────────────────────────
 let adminAuthed=false,adminTab='log',callCycleData=[];
-function openAdmin(){
+async function openAdmin(){
   if(!adminAuthed){
     const pw=prompt('Admin password:');
     if(pw===null)return;
-    if(pw!==getAdminPass()){toast('Incorrect password','error');return;}
+    if(await sha256hex(pw)!==getAdminPass()){toast('Incorrect password','error');return;}
     adminAuthed=true;
   }
   refreshAdminDeviceLabel();
@@ -2333,7 +2380,8 @@ function setSyncStatus(msg,color){
 async function syncToCloud(){
   if(!_supa)return;
   try{
-    const{error}=await _supa.from('iram_org_state').upsert({id:'main',nodes:orgNodes,updated_at:new Date().toISOString(),updated_by:getDeviceId()},{onConflict:'id'});
+    const enc=await encryptPayload(orgNodes);
+    const{error}=await _supa.from('iram_org_state').upsert({id:'main',nodes:enc,updated_at:new Date().toISOString(),updated_by:getDeviceId()},{onConflict:'id'});
     if(error)throw error;
     setSyncStatus('☁ synced '+new Date().toLocaleTimeString(),'#059669');
   }catch(e){setSyncStatus('☁ sync failed','#dc2626');console.warn('Supabase sync error:',e);}
@@ -2344,7 +2392,11 @@ async function loadFromCloud(){
   try{
     const{data,error}=await _supa.from('iram_org_state').select('*').eq('id','main').single();
     if(error||!data||!data.nodes)return false;
-    orgNodes=data.nodes;
+    if(typeof data.nodes==='string'){
+      const dec=await decryptPayload(data.nodes);
+      if(!dec)return false;
+      orgNodes=dec;
+    }else{orgNodes=data.nodes;}
     if(perigeeUsers.length)recalcPerigeeFlags(orgNodes);
     const recalcChanged=recalcMemberTeams();
     try{localStorage.setItem('iram-org-v5',JSON.stringify(orgNodes));}catch(e){}
@@ -2373,10 +2425,15 @@ async function forcePush(){
   try{
     const slim=perigeeUsers.map(u=>({email:u.email,firstName:u.firstName,lastName:u.lastName,status:u.status,access:u.access}));
     const cycleMeta={loadedAt:localStorage.getItem('iram-cycle-loaded-at')||'',filename:localStorage.getItem('iram-cycle-filename')||''};
+    const[encMain,encPerigee,encCycle]=await Promise.all([
+      encryptPayload(orgNodes),
+      slim.length?encryptPayload(slim):Promise.resolve(null),
+      callCycleData.length?encryptPayload({rows:callCycleData,meta:cycleMeta}):Promise.resolve(null)
+    ]);
     const[r1,r2,r3]=await Promise.all([
-      _supa.from('iram_org_state').upsert({id:'main',nodes:orgNodes,updated_at:new Date().toISOString(),updated_by:getDeviceId()},{onConflict:'id'}),
-      slim.length?_supa.from('iram_org_state').upsert({id:'perigee',nodes:slim,updated_at:new Date().toISOString(),updated_by:getDeviceId()},{onConflict:'id'}):Promise.resolve({error:null}),
-      callCycleData.length?_supa.from('iram_org_state').upsert({id:'callcycle',nodes:{rows:callCycleData,meta:cycleMeta},updated_at:new Date().toISOString(),updated_by:getDeviceId()},{onConflict:'id'}):Promise.resolve({error:null})
+      _supa.from('iram_org_state').upsert({id:'main',nodes:encMain,updated_at:new Date().toISOString(),updated_by:getDeviceId()},{onConflict:'id'}),
+      encPerigee?_supa.from('iram_org_state').upsert({id:'perigee',nodes:encPerigee,updated_at:new Date().toISOString(),updated_by:getDeviceId()},{onConflict:'id'}):Promise.resolve({error:null}),
+      encCycle?_supa.from('iram_org_state').upsert({id:'callcycle',nodes:encCycle,updated_at:new Date().toISOString(),updated_by:getDeviceId()},{onConflict:'id'}):Promise.resolve({error:null})
     ]);
     if(r1&&r1.error)throw r1.error;
     if(r2&&r2.error)throw r2.error;
@@ -2794,27 +2851,27 @@ function togglePassVis(id){
   const el=document.getElementById(id);if(!el)return;
   el.type=el.type==='password'?'text':'password';
 }
-function saveEditorPass(){
+async function saveEditorPass(){
   const np=(document.getElementById('editorPassNew').value||'').trim();
   const cp=(document.getElementById('editorPassConfirm').value||'').trim();
   const fb=document.getElementById('editorPassFeedback');
   if(!np){fb.style.display='block';fb.style.color='#dc2626';fb.textContent='Please enter a new password.';return;}
   if(np!==cp){fb.style.display='block';fb.style.color='#dc2626';fb.textContent='Passwords do not match.';return;}
-  localStorage.setItem('iram-editor-pass',np);
+  localStorage.setItem('iram-editor-pass',await sha256hex(np));
   document.getElementById('editorPassNew').value='';document.getElementById('editorPassConfirm').value='';
   fb.style.display='block';fb.style.color='#059669';fb.textContent='✓ Editor password updated.';
   setTimeout(()=>{fb.style.display='none';},3000);
 }
-function saveAdminPass(){
+async function saveAdminPass(){
   const np=(document.getElementById('adminPassNew').value||'').trim();
   const cp=(document.getElementById('adminPassConfirm').value||'').trim();
   const cur=(document.getElementById('adminPassCurrent').value||'').trim();
   const fb=document.getElementById('adminPassFeedback');
-  if(cur!==getAdminPass()){fb.style.display='block';fb.style.color='#dc2626';fb.textContent='Current password is incorrect.';return;}
+  if(await sha256hex(cur)!==getAdminPass()){fb.style.display='block';fb.style.color='#dc2626';fb.textContent='Current password is incorrect.';return;}
   if(!np){fb.style.display='block';fb.style.color='#dc2626';fb.textContent='Please enter a new password.';return;}
   if(np!==cp){fb.style.display='block';fb.style.color='#dc2626';fb.textContent='Passwords do not match.';return;}
-  localStorage.setItem('iram-admin-pass',np);
-  adminAuthed=false; // force re-auth with new password next open
+  localStorage.setItem('iram-admin-pass',await sha256hex(np));
+  adminAuthed=false;
   document.getElementById('adminPassNew').value='';document.getElementById('adminPassConfirm').value='';document.getElementById('adminPassCurrent').value='';
   fb.style.display='block';fb.style.color='#059669';fb.textContent='✓ Admin password updated. You will need the new password next time.';
   setTimeout(()=>{fb.style.display='none';},4000);
@@ -2908,6 +2965,7 @@ if(orgNodes.length===0){orgNodes=getInitialOrg();saveState();}
 recalcMemberTeams();
 render();
 autoSelectRoot();
+migratePasswords();
 if(initSupabase()){
   Promise.all([loadFromCloud(),loadPerigeeFromCloud(),loadCycleFromCloud()]).then(([treeOk,perigeeOk,cycleOk])=>{
     if(perigeeOk)recalcPerigeeFlags(orgNodes);
