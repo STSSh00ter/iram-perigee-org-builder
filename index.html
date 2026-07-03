@@ -2016,6 +2016,12 @@ function exportExcel(){
     const lm=getDirectManager(node.id),asm=getASMFor(node.id),rm=getRegMgrFor(node.id);
     const pu=findPerigeeUser(node.email);
     const{teamName,tl}=getMembershipInfo(node.id);
+    // A person must not appear as a member of the team they lead.
+    // This happens when getMembershipInfo resolves a teamName that this node itself leads.
+    const isSelfLeader=(tl&&tl.id===node.id)||
+      (teamName&&orgNodes.some(g=>g.roleType==='TEAM_GROUP'&&g.teamName===teamName&&getTeamLeaderFor(g.id)?.id===node.id));
+    const exportTeam=isSelfLeader?'':teamName;
+    const exportTl=isSelfLeader?null:tl;
     rows.push({
       'USER ID':'','USER EMAIL':node.email,
       'FIRST NAME':node.firstName,'SURNAME':node.lastName,
@@ -2025,8 +2031,8 @@ function exportExcel(){
       'LEAVE TYPE':isActiveLeave(node)?node.leaveType:'',
       'LEAVE START':isActiveLeave(node)&&node.leaveStart?fmtDate(node.leaveStart):'',
       'LEAVE END':isActiveLeave(node)&&node.leaveEnd?fmtDate(node.leaveEnd):'',
-      'TEAM NAME':teamName,
-      'TEAM LEADER':fmtPerson(tl),
+      'TEAM NAME':exportTeam,
+      'TEAM LEADER':fmtPerson(exportTl),
       'LINE MANAGER':fmtPerson(lm),
       'ASM':node.roleType==='AREA_MANAGER'?fmtPerson(node):fmtPerson(asm),
       'REGIONAL MANAGER':node.roleType==='REGIONAL_MANAGER'?fmtPerson(node):fmtPerson(rm),
