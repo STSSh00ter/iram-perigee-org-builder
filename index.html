@@ -2005,19 +2005,15 @@ function exportPDF(){
   if(wrap) wrap.style.removeProperty('--print-scale');
 }
 
-function exportExcel(){
-  if(!orgNodes.length){toast('Tree is empty — add people first','error');return;}
+// ─── SHARED EXPORT ROW BUILDER ───────────────────────────────────────────────
+// Returns active (non-resigned) staff rows — used by both exportExcel and syncExportTable.
+function buildExportRows(){
   const rows=[];
-  // Rule: 1 person = 1 row. Their membership = the nearest TEAM_GROUP above them.
-  // Their TEAM LEADER = whoever owns/manages that group. They can lead many groups,
-  // appearing as TEAM LEADER in their subordinates' rows — never in their own.
   orgNodes.forEach(node=>{
     if(node.roleType==='TEAM_GROUP')return;
     const lm=getDirectManager(node.id),asm=getASMFor(node.id),rm=getRegMgrFor(node.id);
     const pu=findPerigeeUser(node.email);
     const{teamName,tl}=getMembershipInfo(node.id);
-    // A person must not appear as a member of the team they lead.
-    // This happens when getMembershipInfo resolves a teamName that this node itself leads.
     const isSelfLeader=(tl&&tl.id===node.id)||
       (teamName&&orgNodes.some(g=>g.roleType==='TEAM_GROUP'&&g.teamName===teamName&&getTeamLeaderFor(g.id)?.id===node.id));
     const exportTeam=isSelfLeader?'':teamName;
@@ -2040,10 +2036,54 @@ function exportExcel(){
       'CYCLE STATUS':'ACTIVE','CYCLE':4,'CYCLE START DATE':'','CYCLE END DATE':'',
     });
   });
+  const resignedEmails=new Set(orgNodes.filter(n=>n.resigned&&n.roleType!=='TEAM_GROUP').map(n=>n.email));
+  return rows.filter(r=>!resignedEmails.has(r['USER EMAIL']));
+}
+
+// ─── SUPABASE MIRROR TABLE SYNC ──────────────────────────────────────────────
+async function syncExportTable(){
+  if(!_supa)return;
+  try{
+    const activeRows=buildExportRows();
+    if(!activeRows.length)return;
+    const dbRows=activeRows.map(r=>({
+      user_email:(r['USER EMAIL']||'').toLowerCase().trim()||null,
+      first_name:r['FIRST NAME']||null,
+      last_name:r['SURNAME']||null,
+      status:r['STATUS']||null,
+      assigned_provinces:r['ASSIGNED PROVINCES']||null,
+      job_title:r['JOB TITLE']||null,
+      leave_type:r['LEAVE TYPE']||null,
+      leave_start:r['LEAVE START']||null,
+      leave_end:r['LEAVE END']||null,
+      team_name:r['TEAM NAME']||null,
+      team_leader:r['TEAM LEADER']||null,
+      line_manager:r['LINE MANAGER']||null,
+      asm:r['ASM']||null,
+      regional_manager:r['REGIONAL MANAGER']||null,
+      action:r['ACTION']||null,
+      cycle_status:r['CYCLE STATUS']||null,
+      cycle:r['CYCLE']||null,
+      updated_at:new Date().toISOString(),
+    })).filter(r=>r.user_email);
+    // Upsert current rows
+    const{error}=await _supa.from('iram_staff_export').upsert(dbRows,{onConflict:'user_email'});
+    if(error)throw error;
+    // Remove stale rows (people no longer active/in the tree)
+    const activeEmails=new Set(dbRows.map(r=>r.user_email));
+    const{data:existing}=await _supa.from('iram_staff_export').select('user_email');
+    if(existing){
+      const stale=existing.filter(r=>!activeEmails.has(r.user_email));
+      for(const s of stale)await _supa.from('iram_staff_export').delete().eq('user_email',s.user_email);
+    }
+  }catch(e){console.warn('Export table sync error:',e);}
+}
+
+function exportExcel(){
+  if(!orgNodes.length){toast('Tree is empty — add people first','error');return;}
   const wb=XLSX.utils.book_new();
   const cw=[{wch:10},{wch:34},{wch:16},{wch:16},{wch:18},{wch:14},{wch:22},{wch:12},{wch:14},{wch:12},{wch:28},{wch:38},{wch:38},{wch:38},{wch:28},{wch:14},{wch:8},{wch:8},{wch:16},{wch:14}];
-  const resignedEmails=new Set(orgNodes.filter(n=>n.resigned&&n.roleType!=='TEAM_GROUP').map(n=>n.email));
-  const activeRows=rows.filter(r=>!resignedEmails.has(r['USER EMAIL']));
+  const activeRows=buildExportRows();
   const perigeeRows=activeRows.filter(r=>r.STATUS!=='NOT IN PERIGEE');
   const nipRows=activeRows.filter(r=>r.STATUS==='NOT IN PERIGEE');
   const ws1=XLSX.utils.json_to_sheet(perigeeRows.length?perigeeRows:activeRows);
@@ -2493,6 +2533,7 @@ async function syncToCloud(){
     const{error}=await _supa.from('iram_org_state').upsert({id:'main',nodes:enc,updated_at:new Date().toISOString(),updated_by:getDeviceId()},{onConflict:'id'});
     if(error)throw error;
     setSyncStatus('☁ synced '+new Date().toLocaleTimeString(),'#059669');
+    syncExportTable();
   }catch(e){setSyncStatus('☁ sync failed','#dc2626');console.warn('Supabase sync error:',e);}
 }
 
