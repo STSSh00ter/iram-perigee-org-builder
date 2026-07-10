@@ -1993,23 +1993,38 @@ function exportPDF(){
   const wrap=document.querySelector('.org-wrap');
   if(!wrap){window.print();return;}
   const MM=3.7795; // CSS px per mm at 96dpi
-  const PAD=8;     // mm padding inside the page (added to content, not margin)
-  // Max printable width = A4 landscape = 297mm (margin is 0, we pad content instead)
-  const maxWpx=297*MM;
-  const treeW=wrap.scrollWidth,treeH=wrap.scrollHeight;
-  // Scale to fill width; never upscale
+  const PAD=8;     // mm padding (content padding, not @page margin)
+  // Measure true tree dimensions. wrap.scrollWidth underestimates when float:left li
+  // elements don't propagate width through display:table → flex parent.
+  // Use the scroll PANEL (the true scroll container) and individual card bounds as fallbacks.
+  const panel=document.getElementById('treePanel');
+  const orgTree=wrap.querySelector('.org-tree');
+  // Rightmost / bottommost extent of every node card (most reliable for cut-off issues)
+  let cardMaxR=0,cardMaxB=0;
+  const wrapRect=wrap.getBoundingClientRect();
+  wrap.querySelectorAll('.node-card').forEach(c=>{
+    const r=c.getBoundingClientRect();
+    cardMaxR=Math.max(cardMaxR,r.right);
+    cardMaxB=Math.max(cardMaxB,r.bottom);
+  });
+  const cardW=cardMaxR-wrapRect.left+20; // +20px connector overhang
+  const cardH=cardMaxB-wrapRect.top+20;
+  // Take the maximum across all measurement strategies
+  const treeW=Math.max(wrap.scrollWidth,orgTree?orgTree.scrollWidth:0,panel?panel.scrollWidth:0,cardW);
+  const treeH=Math.max(wrap.scrollHeight,orgTree?orgTree.scrollHeight:0,cardH);
+  // Scale to fill A4-landscape width; never upscale. 3% safety for rounding.
+  const maxWpx=297*MM*0.97;
   const zoom=Math.min(maxWpx/treeW,1);
-  // Physical page size = scaled content + padding on all sides
+  // Physical page size = scaled content + padding
   const pageWmm=(treeW*zoom/MM)+PAD*2;
   const pageHmm=(treeH*zoom/MM)+PAD*2;
-  // Use margin:0 so Chrome's "Default" dialog margins don't shrink the content area.
-  // Headers/footers have no room and are suppressed. Padding on the wrap gives visual breathing room.
+  // margin:0 overrides Chrome's "Default" dialog margins so the content area is exact.
   const styleEl=document.createElement('style');
   styleEl.id='_print_page_size';
-  styleEl.textContent=`@media print{@page{size:${pageWmm.toFixed(1)}mm ${pageHmm.toFixed(1)}mm;margin:0}.org-wrap{padding:${PAD}mm!important}}`;
+  styleEl.textContent=`@media print{@page{size:${pageWmm.toFixed(1)}mm ${pageHmm.toFixed(1)}mm;margin:0}.org-wrap{padding:${PAD}mm!important;box-sizing:border-box!important}}`;
   document.head.appendChild(styleEl);
   wrap.style.zoom=String(zoom);
-  toast('Tip: in the print dialog set Margins → None and uncheck Headers and footers','info');
+  toast('Tip: in print dialog → Margins: None · uncheck Headers and footers','info');
   setTimeout(()=>{window.print();wrap.style.zoom='';styleEl.remove();},800);
 }
 
