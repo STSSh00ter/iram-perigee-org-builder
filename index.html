@@ -1993,24 +1993,24 @@ function exportPDF(){
   const wrap=document.querySelector('.org-wrap');
   if(!wrap){window.print();return;}
   const MM=3.7795; // CSS px per mm at 96dpi
-  const MARGIN=10; // mm each side
-  // Max printable width = A4 landscape minus margins = 277mm
-  const maxWpx=277*MM;
+  const PAD=8;     // mm padding inside the page (added to content, not margin)
+  // Max printable width = A4 landscape = 297mm (margin is 0, we pad content instead)
+  const maxWpx=297*MM;
   const treeW=wrap.scrollWidth,treeH=wrap.scrollHeight;
   // Scale to fill width; never upscale
   const zoom=Math.min(maxWpx/treeW,1);
-  // Page size = scaled content + margins on all sides
-  const pageWmm=(treeW*zoom/MM)+MARGIN*2;
-  const pageHmm=(treeH*zoom/MM)+MARGIN*2;
-  // Inject dynamic @page so the page height exactly fits the tree — no wasted space
+  // Physical page size = scaled content + padding on all sides
+  const pageWmm=(treeW*zoom/MM)+PAD*2;
+  const pageHmm=(treeH*zoom/MM)+PAD*2;
+  // Use margin:0 so Chrome's "Default" dialog margins don't shrink the content area.
+  // Headers/footers have no room and are suppressed. Padding on the wrap gives visual breathing room.
   const styleEl=document.createElement('style');
   styleEl.id='_print_page_size';
-  styleEl.textContent=`@media print{@page{size:${pageWmm.toFixed(1)}mm ${pageHmm.toFixed(1)}mm;margin:${MARGIN}mm}}`;
+  styleEl.textContent=`@media print{@page{size:${pageWmm.toFixed(1)}mm ${pageHmm.toFixed(1)}mm;margin:0}.org-wrap{padding:${PAD}mm!important}}`;
   document.head.appendChild(styleEl);
   wrap.style.zoom=String(zoom);
-  window.print();
-  wrap.style.zoom='';
-  styleEl.remove();
+  toast('Tip: in the print dialog set Margins → None and uncheck Headers and footers','info');
+  setTimeout(()=>{window.print();wrap.style.zoom='';styleEl.remove();},800);
 }
 
 // ─── SHARED EXPORT ROW BUILDER ───────────────────────────────────────────────
