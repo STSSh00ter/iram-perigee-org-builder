@@ -379,7 +379,7 @@ body.viewer-mode #epBody .ac-list{display:none!important}
     page-break-inside:avoid;
   }
   .node-card{box-shadow:0 1px 4px rgba(0,0,0,.12)!important;break-inside:avoid}
-  @page{size:A4 landscape;margin:10mm}
+  @page{margin:10mm}
 }
 </style>
 </head>
@@ -1992,15 +1992,25 @@ function exportPDF(){
   if(!orgNodes.length){toast('Tree is empty — nothing to print','error');return;}
   const wrap=document.querySelector('.org-wrap');
   if(!wrap){window.print();return;}
-  // A4 landscape printable area with 10mm margins: 277mm × 190mm
-  // At 96dpi: 1mm = 3.7795px → ~1047px × 718px
-  const pageW=1047,pageH=718;
+  const MM=3.7795; // CSS px per mm at 96dpi
+  const MARGIN=10; // mm each side
+  // Max printable width = A4 landscape minus margins = 277mm
+  const maxWpx=277*MM;
   const treeW=wrap.scrollWidth,treeH=wrap.scrollHeight;
-  // zoom shrinks the layout box (unlike transform:scale which only scales visually)
-  const zoom=Math.min(pageW/treeW,pageH/treeH,1);
+  // Scale to fill width; never upscale
+  const zoom=Math.min(maxWpx/treeW,1);
+  // Page size = scaled content + margins on all sides
+  const pageWmm=(treeW*zoom/MM)+MARGIN*2;
+  const pageHmm=(treeH*zoom/MM)+MARGIN*2;
+  // Inject dynamic @page so the page height exactly fits the tree — no wasted space
+  const styleEl=document.createElement('style');
+  styleEl.id='_print_page_size';
+  styleEl.textContent=`@media print{@page{size:${pageWmm.toFixed(1)}mm ${pageHmm.toFixed(1)}mm;margin:${MARGIN}mm}}`;
+  document.head.appendChild(styleEl);
   wrap.style.zoom=String(zoom);
   window.print();
   wrap.style.zoom='';
+  styleEl.remove();
 }
 
 // ─── SHARED EXPORT ROW BUILDER ───────────────────────────────────────────────
