@@ -1993,13 +1993,13 @@ function exportPDF(){
   const wrap=document.querySelector('.org-wrap');
   if(!wrap){window.print();return;}
   const MM=3.7795; // CSS px per mm at 96dpi
-  const PAD=8;     // mm padding (content padding, not @page margin)
-  // Measure true tree dimensions. wrap.scrollWidth underestimates when float:left li
-  // elements don't propagate width through display:table → flex parent.
-  // Use the scroll PANEL (the true scroll container) and individual card bounds as fallbacks.
+  const PAD=8;     // mm content padding
+  // ── Measure true tree extent ──────────────────────────────────────────────
+  // wrap.scrollWidth underestimates because float:left li don't propagate width
+  // through display:table → flex. Use the rightmost card getBoundingClientRect
+  // as the ground truth, supplemented by panel and orgTree scrollWidth.
   const panel=document.getElementById('treePanel');
   const orgTree=wrap.querySelector('.org-tree');
-  // Rightmost / bottommost extent of every node card (most reliable for cut-off issues)
   let cardMaxR=0,cardMaxB=0;
   const wrapRect=wrap.getBoundingClientRect();
   wrap.querySelectorAll('.node-card').forEach(c=>{
@@ -2007,25 +2007,31 @@ function exportPDF(){
     cardMaxR=Math.max(cardMaxR,r.right);
     cardMaxB=Math.max(cardMaxB,r.bottom);
   });
-  const cardW=cardMaxR-wrapRect.left+20; // +20px connector overhang
-  const cardH=cardMaxB-wrapRect.top+20;
-  // Take the maximum across all measurement strategies
+  const cardW=cardMaxR-wrapRect.left+40;
+  const cardH=cardMaxB-wrapRect.top+40;
   const treeW=Math.max(wrap.scrollWidth,orgTree?orgTree.scrollWidth:0,panel?panel.scrollWidth:0,cardW);
   const treeH=Math.max(wrap.scrollHeight,orgTree?orgTree.scrollHeight:0,cardH);
-  // Scale to fill A4-landscape width; never upscale. 3% safety for rounding.
-  const maxWpx=297*MM*0.97;
-  const zoom=Math.min(maxWpx/treeW,1);
-  // Physical page size = scaled content + padding
+  // ── Zoom: never shrink below 55% — keeps text ~8pt (readable) ─────────────
+  // Below this threshold the nodes are too small to read. The page grows instead.
+  const MIN_ZOOM=0.55;
+  const A4W=297*MM; // A4 landscape width in px
+  const fitZoom=A4W/treeW;
+  const zoom=Math.min(Math.max(fitZoom,MIN_ZOOM),1);
+  // ── Page size = scaled tree + padding ─────────────────────────────────────
   const pageWmm=(treeW*zoom/MM)+PAD*2;
   const pageHmm=(treeH*zoom/MM)+PAD*2;
-  // margin:0 overrides Chrome's "Default" dialog margins so the content area is exact.
+  // margin:0 overrides Chrome "Default" dialog margins; padding gives breathing room
   const styleEl=document.createElement('style');
   styleEl.id='_print_page_size';
   styleEl.textContent=`@media print{@page{size:${pageWmm.toFixed(1)}mm ${pageHmm.toFixed(1)}mm;margin:0}.org-wrap{padding:${PAD}mm!important;box-sizing:border-box!important}}`;
   document.head.appendChild(styleEl);
   wrap.style.zoom=String(zoom);
-  toast('Tip: in print dialog → Margins: None · uncheck Headers and footers','info');
-  setTimeout(()=>{window.print();wrap.style.zoom='';styleEl.remove();},800);
+  // Warn if the full tree forces a large-format page
+  const msg=fitZoom<MIN_ZOOM
+    ?`Full tree is ${pageWmm.toFixed(0)}mm wide — filter to a team for A4-sized output. In print dialog: Margins→None, uncheck Headers & footers`
+    :`In print dialog: Margins → None · uncheck Headers and footers`;
+  toast(msg,'info');
+  setTimeout(()=>{window.print();wrap.style.zoom='';styleEl.remove();},1000);
 }
 
 // ─── SHARED EXPORT ROW BUILDER ───────────────────────────────────────────────
